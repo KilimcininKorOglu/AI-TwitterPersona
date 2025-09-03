@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+
+{% block title %}Tweet Geçmişi - Twitter Bot{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-history"></i> Tweet Geçmişi ({{ total_count }} kayıt)</h5>
+                <div class="d-flex flex-wrap gap-3">
+                    <!-- Filter Buttons -->
+                    <div class="btn-toolbar">
+                        <div class="btn-group btn-group-sm me-2" role="group">
+                            <button class="btn btn-outline-secondary {% if filter_type == 'all' %}active{% endif %}" onclick="filterTweets('all')">
+                                <i class="fas fa-list me-1"></i>Tümü
+                            </button>
+                            <button class="btn btn-outline-success {% if filter_type == 'success' %}active{% endif %}" onclick="filterTweets('success')">
+                                <i class="fas fa-check-circle me-1"></i>Başarılı
+                            </button>
+                            <button class="btn btn-outline-danger {% if filter_type == 'failed' %}active{% endif %}" onclick="filterTweets('failed')">
+                                <i class="fas fa-times-circle me-1"></i>Başarısız
+                            </button>
+                            <button class="btn btn-outline-info {% if filter_type == 'manual' %}active{% endif %}" onclick="filterTweets('manual')">
+                                <i class="fas fa-hand-paper me-1"></i>Manuel
+                            </button>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button class="btn btn-outline-warning" onclick="bulkRetryFailed()" title="Tüm başarısızları tekrar gönder">
+                                <i class="fas fa-redo me-1"></i>Tekrar Gönder
+                            </button>
+                            <button class="btn btn-outline-danger" onclick="confirmBulkDelete()" title="Seçilenleri sil">
+                                <i class="fas fa-trash-alt me-1"></i>Toplu Sil
+                            </button>
+                            <button class="btn btn-outline-info" onclick="exportTweets()" title="Tweet'leri dışa aktar">
+                                <i class="fas fa-download me-1"></i>Dışa Aktar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if tweets %}
+                    <div class="table-responsive">
+                        <table class="table table-hover table-dark">
+                            <thead>
+                                <tr>
+                                    <th width="50%">Tweet İçeriği</th>
+                                    <th width="12%">Tip</th>
+                                    <th width="12%">Durum</th>
+                                    <th width="13%">Tarih</th>
+                                    <th width="13%">Saat</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tweets-table">
+                                {% for tweet in tweets %}
+                                <tr class="tweet-row" data-id="{{ tweet[0] }}" data-type="{{ tweet[2] }}" data-status="{{ 'success' if tweet[3] else 'failed' }}">
+                                    <td>
+                                        <div class="tweet-content">
+                                            {{ tweet[1][:100] }}{% if tweet[1]|length > 100 %}...{% endif %}
+                                        </div>
+                                        {% if tweet[1]|length > 100 %}
+                                        <small>
+                                            <a href="#" onclick="toggleFullTweet(this)" data-full="{{ tweet[1] }}">
+                                                Devamını göster
+                                            </a>
+                                        </small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if tweet[2] == 'manual' %}
+                                            <span class="badge bg-info">
+                                                <i class="fas fa-hand-paper"></i> Manuel
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-primary">
+                                                <i class="fas fa-robot"></i> Otomatik
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            {% if tweet[3] %}
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-check"></i> Başarılı
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-danger">
+                                                    <i class="fas fa-times"></i> Başarısız
+                                                </span>
+                                                <button class="btn btn-sm btn-outline-primary ms-2" 
+                                                        onclick="retryTweet({{ tweet[0] }})" 
+                                                        title="Tekrar gönder">
+                                                    <i class="fas fa-redo"></i>
+                                                </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td>{{ tweet[5] if tweet[5] else 'N/A' }}</td>
+                                    <td>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span>{{ tweet[4] if tweet[4] else 'N/A' }}</span>
+                                            <button class="btn btn-sm btn-outline-danger" 
+                                                    onclick="deleteTweet({{ tweet[0] }})" 
+                                                    title="Sil">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Pagination -->
+                    <nav aria-label="Tweet pagination">
+                        <ul class="pagination justify-content-center">
+                            {% if page > 1 %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('tweets_history', page=page-1) }}">
+                                    <i class="fas fa-chevron-left"></i> Önceki
+                                </a>
+                            </li>
+                            {% endif %}
+                            
+                            <li class="page-item active">
+                                <span class="page-link">{{ page }}</span>
+                            </li>
+                            
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('tweets_history', page=page+1) }}">
+                                    Sonraki <i class="fas fa-chevron-right"></i>
+                                </a>
+                            </li>
+                        </ul>
+                    </nav>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">Henüz tweet bulunamadı</h5>
+                        <p class="text-muted">Bot çalışmaya başladığında tweetler burada görünecek.</p>
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-primary">
+                            <i class="fas fa-arrow-left"></i> Dashboard'a Dön
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tweet Details Modal -->
+<div class="modal fade" id="tweetModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Tweet Detayları</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="modal-tweet-content"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
+                <button type="button" class="btn btn-primary" onclick="retryTweet()">
+                    <i class="fas fa-redo"></i> Tekrar Gönder
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function filterTweets(type) {
+        // Update URL to use server-side filtering
+        const currentUrl = new URL(window.location);
+        currentUrl.searchParams.set('filter', type);
+        currentUrl.searchParams.set('page', '1'); // Reset to first page
+        window.location.href = currentUrl.toString();
+    }
+    
+    function toggleFullTweet(element) {
+        const content = element.previousElementSibling.querySelector('.tweet-content');
+        const fullText = element.dataset.full;
+        
+        if (element.textContent === 'Devamını göster') {
+            content.textContent = fullText;
+            element.textContent = 'Kısalt';
+        } else {
+            content.textContent = fullText.substring(0, 100) + (fullText.length > 100 ? '...' : '');
+            element.textContent = 'Devamını göster';
+        }
+    }
+    
+    function retryTweet(tweetId) {
+        if (confirm('Bu tweet\'i tekrar göndermek istediğinizden emin misiniz?')) {
+            fetch(`/api/retry_tweet/${tweetId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showNotification(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                showNotification('Bağlantı hatası: ' + error.message, 'error');
+            });
+        }
+    }
+    
+    function deleteTweet(tweetId) {
+        if (confirm('Bu tweet\'i veritabanından silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.')) {
+            fetch(`/api/delete_tweet/${tweetId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showNotification(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                showNotification('Bağlantı hatası: ' + error.message, 'error');
+            });
+        }
+    }
+    
+    function bulkRetryFailed() {
+        if (confirm('Tüm başarısız tweet\'leri tekrar göndermek istediğinizden emin misiniz?')) {
+            const button = event.target;
+            const originalText = button.innerHTML;
+            
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gönderiliyor...';
+            button.disabled = true;
+            
+            fetch('/api/bulk_retry', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                showNotification(data.message, data.success ? 'success' : 'error');
+                if (data.success) {
+                    setTimeout(() => location.reload(), 2000);
+                }
+            })
+            .catch(error => {
+                showNotification('Bağlantı hatası: ' + error.message, 'error');
+            })
+            .finally(() => {
+                button.innerHTML = originalText;
+                button.disabled = false;
+            });
+        }
+    }
+    
+    function confirmBulkDelete() {
+        alert('Toplu silme özelliği henüz implement edilmedi.');
+    }
+    
+    function exportTweets() {
+        const button = event.target;
+        const originalText = button.innerHTML;
+        
+        button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Dışa Aktarılıyor...';
+        button.disabled = true;
+        
+        fetch('/api/export/tweets')
+        .then(response => response.blob())
+        .then(blob => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `tweets_export_${new Date().toISOString().slice(0,10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+            showNotification('Tweet geçmişi başarıyla dışa aktarıldı!', 'success');
+        })
+        .catch(error => {
+            showNotification('Dışa aktarma hatası: ' + error.message, 'error');
+        })
+        .finally(() => {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        });
+    }
+    
+    // Notification function (reuse from app.js)
+    function showNotification(message, type = 'info') {
+        // Simple alert for now - can be enhanced with toast notifications
+        alert(message);
+    }
+    
+    // Auto-refresh every 30 seconds
+    setInterval(() => {
+        if (document.visibilityState === 'visible') {
+            location.reload();
+        }
+    }, 30000);
+</script>
+{% endblock %}

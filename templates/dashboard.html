@@ -1,0 +1,257 @@
+{% extends "base.html" %} {% block title %}Anasayfa - AI-TwitterPersona{%
+endblock %} {% block content %}
+<div class="row">
+  <!-- Bot Status Card -->
+  <div class="col-md-6 mb-4">
+    <div class="card">
+      <div class="card-header">
+        <h5><i class="fas fa-robot"></i> Bot İşlemleri</h5>
+      </div>
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h6>Durum:</h6>
+            {% if bot_running %}
+            <span class="badge bg-success fs-6">
+              <i class="fas fa-play"></i> Çalışıyor
+            </span>
+            {% else %}
+            <span class="badge bg-danger fs-6">
+              <i class="fas fa-stop"></i> Durduruldu
+            </span>
+            {% endif %}
+          </div>
+          <div>
+            {% if bot_running %}
+            <button class="btn btn-outline-danger" onclick="controlBot('stop')">
+              <i class="fas fa-stop"></i> Durdur
+            </button>
+            {% else %}
+            <button class="btn btn-outline-success" onclick="controlBot('start')">
+              <i class="fas fa-play"></i> Başlat
+            </button>
+            {% endif %}
+          </div>
+        </div>
+
+        {% if stats.bot_start_time %}
+        <hr />
+        <small class="text-muted">
+          <i class="fas fa-clock"></i> Başlatılma: {{ stats.bot_start_time }}
+        </small>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Tweet Statistics Card -->
+  <div class="col-md-6 mb-4">
+    <div class="card">
+      <div class="card-header">
+        <h5><i class="fas fa-chart-bar"></i> Tweet İstatistikleri</h5>
+      </div>
+      <div class="card-body">
+        <div class="row text-center">
+          <div class="col-4">
+            <h4 class="text-primary">{{ stats.daily_tweets }}</h4>
+            <small>Bugün</small>
+          </div>
+          <div class="col-4">
+            <h4 class="text-info">{{ stats.total_tweets }}</h4>
+            <small>Toplam</small>
+          </div>
+          <div class="col-4">
+            <h4 class="text-success">
+              <span id="next-tweet-countdown">{{ config.cycle_duration }}</span>
+              dakika
+            </h4>
+            <small>Sonraki Tweet</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Last Tweet Card -->
+{% if stats.last_tweet %}
+<div class="row">
+  <div class="col-12 mb-4">
+    <div class="card">
+      <div class="card-header">
+        <h5><i class="fas fa-comment"></i> Son Tweet</h5>
+      </div>
+      <div class="card-body">
+        <blockquote class="blockquote">
+          <p>"{{ stats.last_tweet }}"</p>
+          <footer class="blockquote-footer">
+            <i class="fas fa-clock"></i> {{ stats.last_tweet_time }}
+          </footer>
+        </blockquote>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Quick Actions -->
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h5><i class="fas fa-bolt"></i> Hızlı İşlemler</h5>
+      </div>
+      <div class="card-body">
+        <div class="btn-group" role="group">
+          <button class="btn btn-outline-danger" onclick="emergencyStop()">
+            <i class="fas fa-stop-circle"></i> ACİL DURDUR
+          </button>
+          <button class="btn btn-outline-warning" onclick="clearDatabase()">
+            <i class="fas fa-database"></i> Veritabanını Temizle
+          </button>
+          <button class="btn btn-outline-info" onclick="exportData()">
+            <i class="fas fa-download"></i> Veri Dışa Aktar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block scripts %}
+<script>
+  // Real-time updates
+  setInterval(updateStatus, 5000); // Update every 5 seconds
+
+  function updateStatus() {
+    fetch("/api/status")
+      .then((response) => response.json())
+      .then((data) => {
+        // Update page with real-time data
+        location.reload(); // Simple refresh for now
+      });
+  }
+
+  function controlBot(action) {
+    fetch("/api/control", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": document
+          .querySelector('meta[name="csrf-token"]')
+          .getAttribute("content"),
+      },
+      body: JSON.stringify({ action: action }),
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.success) {
+          alert(data.message);
+          location.reload();
+        } else {
+          alert("Hata: " + data.message);
+        }
+      });
+  }
+
+  function refreshTrends() {
+    alert("Trendler yenileniyor...");
+    // Implementation for trend refresh
+  }
+
+  function forceTweet() {
+    if (confirm("Hemen tweet atmak istediğinizden emin misiniz?")) {
+      const button = event.target;
+      const originalText = button.innerHTML;
+
+      button.innerHTML =
+        '<i class="fas fa-spinner fa-spin"></i> Gönderiliyor...';
+      button.disabled = true;
+
+      fetch("/api/force_tweet", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": document
+            .querySelector('meta[name="csrf-token"]')
+            .getAttribute("content"),
+        },
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          if (data.success) {
+            alert("Tweet başarıyla gönderildi!\n\n" + data.tweet);
+          } else {
+            alert("Tweet gönderilemedi: " + data.message);
+          }
+        })
+        .catch((error) => {
+          alert("Hata oluştu: " + error.message);
+        })
+        .finally(() => {
+          button.innerHTML = originalText;
+          button.disabled = false;
+        });
+    }
+  }
+
+  function emergencyStop() {
+    if (
+      confirm(
+        "ACİL DURDURMA yapılacak! Tüm bot işlemleri durdurulacak. Emin misiniz?"
+      )
+    ) {
+      fetch("/api/emergency_stop", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": document
+            .querySelector('meta[name="csrf-token"]')
+            .getAttribute("content"),
+        },
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          alert(data.message);
+          location.reload();
+        })
+        .catch((error) => {
+          alert("Acil durdurma hatası: " + error.message);
+        });
+    }
+  }
+
+  function clearDatabase() {
+    if (
+      confirm(
+        "Tüm tweet veritabanını temizlemek istediğinizden emin misiniz? Bu işlem GERİ ALINAMAZ!"
+      )
+    ) {
+      if (
+        confirm("SON UYARI: Tüm tweet geçmişi silinecek. Devam edilsin mi?")
+      ) {
+        fetch("/api/clear_database", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": document
+              .querySelector('meta[name="csrf-token"]')
+              .getAttribute("content"),
+          },
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            alert(data.message);
+            location.reload();
+          })
+          .catch((error) => {
+            alert("Veritabanı temizleme hatası: " + error.message);
+          });
+      }
+    }
+  }
+
+  function exportData() {
+    alert("Veri dışa aktarma özelliği gelecek güncellemede eklenecek.");
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,33 @@
+# AI-TwitterPersona Dashboard Systemd Service
+# Copy this file to /etc/systemd/system/ai-twitterpersona.service
+
+[Unit]
+Description=AI-TwitterPersona Dashboard
+After=network.target
+
+[Service]
+Type=notify
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/AI-TwitterPersona
+Environment=PATH=/opt/AI-TwitterPersona/venv/bin
+ExecStart=/opt/AI-TwitterPersona/venv/bin/gunicorn --config gunicorn.conf.py app:app
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
+Restart=on-failure
+RestartSec=10
+
+# Security settings
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/AI-TwitterPersona
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target
