@@ -1,0 +1,471 @@
+{% extends "base.html" %}
+
+{% block title %}Prompt Düzenleyici - AI-TwitterPersona{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4">
+            <i class="fas fa-edit text-primary"></i> Prompt ve Persona Düzenleyici
+        </h2>
+    </div>
+</div>
+
+<!-- Persona Settings Section -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-user-circle"></i> Persona Ayarları
+                    <small class="text-muted">- Karakterinizi tanımlayın</small>
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row" id="persona-settings-container">
+                    <!-- Persona settings will be loaded here via JavaScript -->
+                </div>
+                <div class="mt-3">
+                    <button id="save-persona-btn" class="btn btn-outline-success">
+                        <i class="fas fa-save"></i> Persona Ayarlarını Kaydet
+                    </button>
+                    <button id="preview-persona-btn" class="btn btn-outline-info">
+                        <i class="fas fa-eye"></i> Önizleme
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Prompt Templates Section -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-comments"></i> Prompt Template'leri
+                    <small class="text-muted">- Her durum için özel komutlar</small>
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- Prompt Tabs -->
+                <ul class="nav nav-pills mb-3" id="prompt-tabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="tech-tab" data-bs-toggle="pill" data-bs-target="#tech-prompt" type="button" role="tab">
+                            <i class="fas fa-microchip"></i> Teknoloji
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="casual-tab" data-bs-toggle="pill" data-bs-target="#casual-prompt" type="button" role="tab">
+                            <i class="fas fa-coffee"></i> Gündelik
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="sad-tab" data-bs-toggle="pill" data-bs-target="#sad-prompt" type="button" role="tab">
+                            <i class="fas fa-heart-broken"></i> Üzücü
+                        </button>
+                    </li>
+                </ul>
+
+                <!-- Prompt Tab Contents -->
+                <div class="tab-content" id="prompt-tab-content">
+                    <!-- Tech Prompt -->
+                    <div class="tab-pane fade show active" id="tech-prompt" role="tabpanel">
+                        <div class="prompt-editor-section">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6><i class="fas fa-microchip"></i> Teknoloji Prompt'u</h6>
+                                <div>
+                                    <div class="form-check form-switch d-inline-block me-3">
+                                        <input class="form-check-input" type="checkbox" id="tech-active" checked>
+                                        <label class="form-check-label" for="tech-active">Aktif</label>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="testPrompt('tech')">
+                                        <i class="fas fa-play"></i> Test Et
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="tech-description" class="form-label">Açıklama:</label>
+                                <input type="text" class="form-control" id="tech-description" placeholder="Bu prompt'un amacını açıklayın...">
+                            </div>
+                            <div class="mb-3">
+                                <label for="tech-textarea" class="form-label">Prompt İçeriği:</label>
+                                <textarea class="form-control prompt-editor" id="tech-textarea" rows="12" placeholder="Teknoloji konularındaki prompt'unuzu buraya yazın..."></textarea>
+                                <div class="form-text">
+                                    <strong>Kullanılabilir değişkenler:</strong> 
+                                    <code>{persona_name}</code>, <code>{persona_age}</code>, <code>{persona_location}</code>, 
+                                    <code>{persona_personality}</code>, <code>{persona_language}</code>, <code>{max_tweet_length}</code>, <code>{interaction_style}</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Casual Prompt -->
+                    <div class="tab-pane fade" id="casual-prompt" role="tabpanel">
+                        <div class="prompt-editor-section">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6><i class="fas fa-coffee"></i> Gündelik Prompt'u</h6>
+                                <div>
+                                    <div class="form-check form-switch d-inline-block me-3">
+                                        <input class="form-check-input" type="checkbox" id="casual-active" checked>
+                                        <label class="form-check-label" for="casual-active">Aktif</label>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="testPrompt('casual')">
+                                        <i class="fas fa-play"></i> Test Et
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="casual-description" class="form-label">Açıklama:</label>
+                                <input type="text" class="form-control" id="casual-description" placeholder="Bu prompt'un amacını açıklayın...">
+                            </div>
+                            <div class="mb-3">
+                                <label for="casual-textarea" class="form-label">Prompt İçeriği:</label>
+                                <textarea class="form-control prompt-editor" id="casual-textarea" rows="12" placeholder="Gündelik konulardaki prompt'unuzu buraya yazın..."></textarea>
+                                <div class="form-text">
+                                    <strong>Kullanılabilir değişkenler:</strong> 
+                                    <code>{persona_name}</code>, <code>{persona_age}</code>, <code>{persona_location}</code>, 
+                                    <code>{persona_personality}</code>, <code>{persona_language}</code>, <code>{max_tweet_length}</code>, <code>{interaction_style}</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sad Prompt -->
+                    <div class="tab-pane fade" id="sad-prompt" role="tabpanel">
+                        <div class="prompt-editor-section">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6><i class="fas fa-heart-broken"></i> Üzücü Prompt'u</h6>
+                                <div>
+                                    <div class="form-check form-switch d-inline-block me-3">
+                                        <input class="form-check-input" type="checkbox" id="sad-active" checked>
+                                        <label class="form-check-label" for="sad-active">Aktif</label>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="testPrompt('sad')">
+                                        <i class="fas fa-play"></i> Test Et
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="sad-description" class="form-label">Açıklama:</label>
+                                <input type="text" class="form-control" id="sad-description" placeholder="Bu prompt'un amacını açıklayın...">
+                            </div>
+                            <div class="mb-3">
+                                <label for="sad-textarea" class="form-label">Prompt İçeriği:</label>
+                                <textarea class="form-control prompt-editor" id="sad-textarea" rows="12" placeholder="Üzücü konulardaki prompt'unuzu buraya yazın..."></textarea>
+                                <div class="form-text">
+                                    <strong>Kullanılabilir değişkenler:</strong> 
+                                    <code>{persona_name}</code>, <code>{persona_age}</code>, <code>{persona_location}</code>, 
+                                    <code>{persona_personality}</code>, <code>{persona_language}</code>, <code>{max_tweet_length}</code>, <code>{interaction_style}</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="mt-4">
+                    <button id="save-prompts-btn" class="btn btn-outline-success">
+                        <i class="fas fa-save"></i> Tüm Prompt'ları Kaydet
+                    </button>
+                    <button id="reset-prompts-btn" class="btn btn-outline-warning">
+                        <i class="fas fa-undo"></i> Varsayılana Sıfırla
+                    </button>
+                    <button id="export-prompts-btn" class="btn btn-outline-info">
+                        <i class="fas fa-download"></i> Dışa Aktar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-eye"></i> Prompt Önizleme
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="preview-content" class="border p-3 bg-light rounded">
+                    <!-- Preview content will be loaded here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Kapat</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay" class="d-none">
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Yükleniyor...</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadPersonaSettings();
+    loadPrompts();
+    
+    // Save persona settings
+    document.getElementById('save-persona-btn').addEventListener('click', savePersonaSettings);
+    
+    // Preview persona
+    document.getElementById('preview-persona-btn').addEventListener('click', previewPersona);
+    
+    // Save prompts
+    document.getElementById('save-prompts-btn').addEventListener('click', saveAllPrompts);
+    
+    // Reset prompts
+    document.getElementById('reset-prompts-btn').addEventListener('click', resetPrompts);
+    
+    // Export prompts
+    document.getElementById('export-prompts-btn').addEventListener('click', exportPrompts);
+});
+
+async function loadPersonaSettings() {
+    try {
+        showLoading(true);
+        const response = await fetch('/api/persona-settings');
+        const data = await response.json();
+        
+        if (data.success) {
+            displayPersonaSettings(data.settings);
+        } else {
+            showNotification('Persona ayarları yüklenirken hata: ' + data.message, 'error');
+        }
+    } catch (error) {
+        showNotification('Persona ayarları yüklenemedi', 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
+function displayPersonaSettings(settings) {
+    const container = document.getElementById('persona-settings-container');
+    container.innerHTML = '';
+    
+    settings.forEach(setting => {
+        const col = document.createElement('div');
+        col.className = 'col-md-6 mb-3';
+        
+        col.innerHTML = `
+            <label for="setting-${setting.setting_key}" class="form-label">
+                <strong>${setting.display_name}</strong>
+            </label>
+            <input type="text" 
+                   class="form-control persona-setting" 
+                   id="setting-${setting.setting_key}" 
+                   data-key="${setting.setting_key}"
+                   value="${setting.setting_value}" 
+                   placeholder="${setting.description}">
+            <div class="form-text">${setting.description}</div>
+        `;
+        
+        container.appendChild(col);
+    });
+}
+
+async function loadPrompts() {
+    try {
+        const response = await fetch('/api/prompts');
+        const data = await response.json();
+        
+        if (data.success) {
+            displayPrompts(data.prompts);
+        } else {
+            showNotification('Prompt\'lar yüklenirken hata: ' + data.message, 'error');
+        }
+    } catch (error) {
+        showNotification('Prompt\'lar yüklenemedi', 'error');
+    }
+}
+
+function displayPrompts(prompts) {
+    prompts.forEach(prompt => {
+        const textarea = document.getElementById(`${prompt.prompt_type}-textarea`);
+        const description = document.getElementById(`${prompt.prompt_type}-description`);
+        const activeCheckbox = document.getElementById(`${prompt.prompt_type}-active`);
+        
+        if (textarea) textarea.value = prompt.prompt_text;
+        if (description) description.value = prompt.description || '';
+        if (activeCheckbox) activeCheckbox.checked = prompt.is_active;
+    });
+}
+
+async function savePersonaSettings() {
+    try {
+        showLoading(true);
+        const settings = document.querySelectorAll('.persona-setting');
+        const promises = [];
+        
+        settings.forEach(setting => {
+            const key = setting.dataset.key;
+            const value = setting.value;
+            
+            const promise = fetch(`/api/persona-settings/${key}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: JSON.stringify({ setting_value: value })
+            });
+            promises.push(promise);
+        });
+        
+        await Promise.all(promises);
+        showNotification('Persona ayarları başarıyla kaydedildi!', 'success');
+        
+    } catch (error) {
+        showNotification('Persona ayarları kaydedilemedi', 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
+async function saveAllPrompts() {
+    try {
+        showLoading(true);
+        const promptTypes = ['tech', 'casual', 'sad'];
+        const promises = [];
+        
+        promptTypes.forEach(type => {
+            const textarea = document.getElementById(`${type}-textarea`);
+            const description = document.getElementById(`${type}-description`);
+            const isActive = document.getElementById(`${type}-active`).checked;
+            
+            if (textarea && textarea.value.trim()) {
+                const promise = fetch(`/api/prompts/${type}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken()
+                    },
+                    body: JSON.stringify({
+                        prompt_text: textarea.value,
+                        description: description.value
+                    })
+                });
+                promises.push(promise);
+                
+                // Handle active status separately if needed
+                if (!isActive) {
+                    const togglePromise = fetch(`/api/prompts/${type}/toggle`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': getCSRFToken()
+                        }
+                    });
+                    promises.push(togglePromise);
+                }
+            }
+        });
+        
+        await Promise.all(promises);
+        showNotification('Tüm prompt\'lar başarıyla kaydedildi!', 'success');
+        
+    } catch (error) {
+        showNotification('Prompt\'lar kaydedilemedi', 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
+async function previewPersona() {
+    try {
+        const settings = {};
+        document.querySelectorAll('.persona-setting').forEach(setting => {
+            settings[setting.dataset.key] = setting.value;
+        });
+        
+        // Get active prompt
+        const activeTab = document.querySelector('.nav-link.active').id.replace('-tab', '');
+        const promptText = document.getElementById(`${activeTab}-textarea`).value;
+        
+        // Format prompt with current settings
+        let formattedPrompt = promptText;
+        Object.keys(settings).forEach(key => {
+            const placeholder = `{${key}}`;
+            formattedPrompt = formattedPrompt.replace(new RegExp(placeholder, 'g'), settings[key]);
+        });
+        
+        // Show preview
+        document.getElementById('preview-content').innerHTML = `
+            <h6>Persona: ${settings.persona_name || 'Varsayılan'}</h6>
+            <p><strong>Yaş:</strong> ${settings.persona_age}, <strong>Konum:</strong> ${settings.persona_location}</p>
+            <hr>
+            <h6>Formatlanmış Prompt (${activeTab}):</h6>
+            <pre style="white-space: pre-wrap; font-family: inherit;">${formattedPrompt}</pre>
+        `;
+        
+        new bootstrap.Modal(document.getElementById('previewModal')).show();
+        
+    } catch (error) {
+        showNotification('Önizleme oluşturulamadı', 'error');
+    }
+}
+
+function testPrompt(promptType) {
+    // This could make a test API call to generate a sample tweet
+    showNotification(`${promptType} prompt test özelliği geliştirilecek`, 'info');
+}
+
+function resetPrompts() {
+    if (confirm('Tüm prompt\'ları varsayılan değerlere sıfırlamak istediğinizden emin misiniz?')) {
+        showNotification('Sıfırlama özelliği geliştirilecek', 'info');
+    }
+}
+
+function exportPrompts() {
+    // Export current prompts as JSON
+    showNotification('Export özelliği geliştirilecek', 'info');
+}
+
+function showLoading(show) {
+    const overlay = document.getElementById('loadingOverlay');
+    if (show) {
+        overlay.classList.remove('d-none');
+    } else {
+        overlay.classList.add('d-none');
+    }
+}
+
+function showNotification(message, type) {
+    const alertClass = type === 'success' ? 'alert-success' : 
+                      type === 'error' ? 'alert-danger' : 'alert-info';
+    
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
+    alertDiv.style.top = '20px';
+    alertDiv.style.right = '20px';
+    alertDiv.style.zIndex = '9999';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(alertDiv);
+    
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.parentNode.removeChild(alertDiv);
+        }
+    }, 5000);
+}
+
+function getCSRFToken() {
+    return document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || '';
+}
+</script>
+{% endblock %}

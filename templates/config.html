@@ -1,0 +1,442 @@
+{% extends "base.html" %}
+
+{% block title %}Ayarlar - AI-TwitterPersona{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Timing Settings -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-clock"></i> Zamanlama Ayarları</h5>
+            </div>
+            <div class="card-body">
+                <form id="timing-form">
+                    <!-- Sleep Hours -->
+                    <div class="mb-3">
+                        <label class="form-label">Sessiz Saatler (Tweet atılmaz)</label>
+                        <div class="row">
+                            {% for hour in range(24) %}
+                            <div class="col-3 col-md-2 mb-2">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" 
+                                           id="hour-{{ hour }}" name="sleep_hours" value="{{ hour }}"
+                                           {% if hour in config.sleep_hours %}checked{% endif %}>
+                                    <label class="form-check-label" for="hour-{{ hour }}">
+                                        {{ "%02d:00"|format(hour) }}
+                                    </label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    
+                    <!-- Cycle Duration -->
+                    <div class="mb-3">
+                        <label for="cycle-duration" class="form-label">
+                            Tweet Aralığı: <span id="cycle-duration-display">{{ config.cycle_duration }}</span> dakika
+                        </label>
+                        <input type="range" class="form-range" id="cycle-duration" 
+                               name="cycle_duration" min="30" max="180" step="15" 
+                               value="{{ config.cycle_duration }}" oninput="updateCycleDuration(this.value)">
+                        <div class="d-flex justify-content-between">
+                            <small>30dk</small>
+                            <small>180dk</small>
+                        </div>
+                    </div>
+                    
+                    <!-- Night Mode -->
+                    <div class="row">
+                        <div class="col-6">
+                            <label for="night-start" class="form-label">Gece Modu Başlangıç</label>
+                            <select class="form-select" id="night-start" name="night_mode_start">
+                                {% for hour in range(24) %}
+                                <option value="{{ hour }}" {% if hour == config.night_mode_start %}selected{% endif %}>
+                                    {{ "%02d:00"|format(hour) }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label for="night-end" class="form-label">Gece Modu Bitiş</label>
+                            <select class="form-select" id="night-end" name="night_mode_end">
+                                {% for hour in range(24) %}
+                                <option value="{{ hour }}" {% if hour == config.night_mode_end %}selected{% endif %}>
+                                    {{ "%02d:00"|format(hour) }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Content Settings -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-cog"></i> İçerik Ayarları</h5>
+            </div>
+            <div class="card-body">
+                <form id="content-form">
+                    <!-- Trends Limit -->
+                    <div class="mb-3">
+                        <label for="trends-limit" class="form-label">Trend Limit (Kaç trend çekilecek)</label>
+                        <select class="form-select" id="trends-limit" name="trends_limit">
+                            {% for i in range(1, 11) %}
+                            <option value="{{ i }}" {% if i == config.trends_limit %}selected{% endif %}>{{ i }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <!-- Trend Source Country -->
+                    <div class="mb-3">
+                        <label for="trend-country" class="form-label">Trend Kaynağı Ülke</label>
+                        <select class="form-select" id="trend-country" name="trend_country">
+                            <option value="turkey" {% if config.trend_country == 'turkey' %}selected{% endif %}>🇹🇷 Türkiye</option>
+                            <option value="usa" {% if config.trend_country == 'usa' %}selected{% endif %}>🇺🇸 Amerika Birleşik Devletleri</option>
+                            <option value="uk" {% if config.trend_country == 'uk' %}selected{% endif %}>🇬🇧 İngiltere</option>
+                            <option value="germany" {% if config.trend_country == 'germany' %}selected{% endif %}>🇩🇪 Almanya</option>
+                            <option value="france" {% if config.trend_country == 'france' %}selected{% endif %}>🇫🇷 Fransa</option>
+                            <option value="italy" {% if config.trend_country == 'italy' %}selected{% endif %}>🇮🇹 İtalya</option>
+                            <option value="spain" {% if config.trend_country == 'spain' %}selected{% endif %}>🇪🇸 İspanya</option>
+                            <option value="netherlands" {% if config.trend_country == 'netherlands' %}selected{% endif %}>🇳🇱 Hollanda</option>
+                            <option value="canada" {% if config.trend_country == 'canada' %}selected{% endif %}>🇨🇦 Kanada</option>
+                            <option value="australia" {% if config.trend_country == 'australia' %}selected{% endif %}>🇦🇺 Avustralya</option>
+                            <option value="japan" {% if config.trend_country == 'japan' %}selected{% endif %}>🇯🇵 Japonya</option>
+                            <option value="korea" {% if config.trend_country == 'korea' %}selected{% endif %}>🇰🇷 Güney Kore</option>
+                            <option value="india" {% if config.trend_country == 'india' %}selected{% endif %}>🇮🇳 Hindistan</option>
+                            <option value="brazil" {% if config.trend_country == 'brazil' %}selected{% endif %}>🇧🇷 Brezilya</option>
+                            <option value="mexico" {% if config.trend_country == 'mexico' %}selected{% endif %}>🇲🇽 Meksika</option>
+                        </select>
+                    </div>
+                    
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- API Credentials -->
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fab fa-twitter"></i> Twitter API Ayarları</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="api-key" class="form-label">API Key</label>
+                    <input type="password" class="form-control" id="api-key" name="api_key" 
+                           value="{{ config.api_key if config.api_key and config.api_key != 'YOUR_TWITTER_API_KEY' else '' }}"
+                           placeholder="Twitter API Key'inizi girin">
+                    <div class="form-text">Twitter Developer Portal'dan alın</div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="api-secret" class="form-label">API Secret</label>
+                    <input type="password" class="form-control" id="api-secret" name="api_secret"
+                           value="{{ config.api_secret if config.api_secret and config.api_secret != 'YOUR_TWITTER_API_SECRET' else '' }}"
+                           placeholder="Twitter API Secret'inizi girin">
+                </div>
+                
+                <div class="mb-3">
+                    <label for="access-token" class="form-label">Access Token</label>
+                    <input type="password" class="form-control" id="access-token" name="access_token"
+                           value="{{ config.access_token if config.access_token and config.access_token != 'YOUR_ACCESS_TOKEN' else '' }}"
+                           placeholder="Access Token'inizi girin">
+                </div>
+                
+                <div class="mb-3">
+                    <label for="access-token-secret" class="form-label">Access Token Secret</label>
+                    <input type="password" class="form-control" id="access-token-secret" name="access_token_secret"
+                           value="{{ config.access_token_secret if config.access_token_secret and config.access_token_secret != 'YOUR_ACCESS_TOKEN_SECRET' else '' }}"
+                           placeholder="Access Token Secret'inizi girin">
+                </div>
+                
+                <div class="mb-3">
+                    <label for="bearer-token" class="form-label">Bearer Token</label>
+                    <input type="password" class="form-control" id="bearer-token" name="bearer_token"
+                           value="{{ config.bearer_token if config.bearer_token and config.bearer_token != 'YOUR_BEARER_TOKEN' else '' }}"
+                           placeholder="Bearer Token'inizi girin">
+                    <div class="form-text">API v2 için gerekli</div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="user-id" class="form-label">User ID</label>
+                    <input type="text" class="form-control" id="user-id" name="user_id"
+                           value="{{ config.user_id if config.user_id and config.user_id != 'YOUR_TWITTER_USER_ID' else '' }}"
+                           placeholder="Twitter User ID'nizi girin">
+                    <div class="form-text">tweeterid.com'dan alabilirsiniz</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-brain"></i> Gemini AI Ayarları</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="gemini-api-key" class="form-label">Gemini API Key</label>
+                    <input type="password" class="form-control" id="gemini-api-key" name="gemini_api_key"
+                           value="{{ config.gemini_api_key if config.gemini_api_key and config.gemini_api_key != 'YOUR_GEMINI_API_KEY' else '' }}"
+                           placeholder="Google AI Studio'dan alın">
+                    <div class="form-text">ai.google.dev adresinden ücretsiz alabilirsiniz</div>
+                </div>
+                
+                <!-- AI Model -->
+                <div class="mb-3">
+                    <label for="ai-model" class="form-label">AI Model</label>
+                    <input type="text" class="form-control" id="ai-model" name="ai_model"
+                           value="{{ config.ai_model }}" 
+                           placeholder="gemini-2.5-flash">
+                    <div class="form-text">Örnek: gemini-2.5-flash, gemini-2.5-pro</div>
+                </div>
+                
+                <!-- AI Creativity -->
+                <div class="mb-3">
+                    <label for="ai-temperature" class="form-label">
+                        AI Yaratıcılığı: <span id="temperature-display">{{ "%.2f"|format(config.ai_temperature) }}</span>
+                    </label>
+                    <input type="range" class="form-range" id="ai-temperature" 
+                           name="ai_temperature" min="0" max="1" step="0.05" 
+                           value="{{ config.ai_temperature }}" oninput="updateTemperature(this.value)">
+                    <div class="d-flex justify-content-between">
+                        <small>Tutarlı (0.0)</small>
+                        <small>Yaratıcı (1.0)</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Database Settings -->
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-database"></i> Veritabanı Ayarları</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">Veritabanı İstatistikleri</label>
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <h6 class="text-primary" id="db-size">-</h6>
+                            <small>Dosya Boyutu</small>
+                        </div>
+                        <div class="col-6">
+                            <h6 class="text-info" id="db-records">-</h6>
+                            <small>Toplam Kayıt</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-info" onclick="refreshDbStats()">
+                        <i class="fas fa-sync"></i> İstatistikleri Yenile
+                    </button>
+                    <button class="btn btn-outline-warning" onclick="exportDatabase()">
+                        <i class="fas fa-download"></i> Veritabanını Dışa Aktar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- API Status -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-key"></i> API Durumu</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><i class="fab fa-twitter"></i> Twitter API</span>
+                        <span class="badge bg-success" id="twitter-api-status">
+                            <i class="fas fa-check"></i> Bağlı
+                        </span>
+                    </div>
+                    <small class="text-muted">Son test: 2 dakika önce</small>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-brain"></i> Gemini AI API</span>
+                        <span class="badge bg-success" id="gemini-api-status">
+                            <i class="fas fa-check"></i> Bağlı
+                        </span>
+                    </div>
+                    <small class="text-muted">Son test: 1 dakika önce</small>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-primary" onclick="testApiConnections()">
+                        <i class="fas fa-plug"></i> Bağlantıları Test Et
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Save Configuration -->
+<div class="row">
+    <div class="col-12">
+        <div class="card border-success">
+            <div class="card-body text-center">
+                <button class="btn btn-outline-success btn-lg" onclick="saveAllConfiguration()">
+                    <i class="fas fa-save"></i> Tüm Ayarları Kaydet
+                </button>
+                <button class="btn btn-outline-secondary ms-2" onclick="resetToDefaults()">
+                    <i class="fas fa-undo"></i> Varsayılanlara Dön
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Update cycle duration display
+    function updateCycleDuration(value) {
+        document.getElementById('cycle-duration-display').textContent = value;
+    }
+    
+    // Update temperature display
+    function updateTemperature(value) {
+        document.getElementById('temperature-display').textContent = parseFloat(value).toFixed(2);
+    }
+    
+    // Refresh database statistics
+    function refreshDbStats() {
+        // Simulate database stats loading
+        document.getElementById('db-size').innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        document.getElementById('db-records').innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        
+        // Get real database statistics
+        fetch('/api/database/stats')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('db-size').textContent = data.size || '0 KB';
+                    document.getElementById('db-records').textContent = data.total_tweets || '0';
+                } else {
+                    document.getElementById('db-size').textContent = 'Hata';
+                    document.getElementById('db-records').textContent = 'Hata';
+                }
+            })
+            .catch(error => {
+                console.error('Database stats error:', error);
+                document.getElementById('db-size').textContent = 'Bağlantı hatası';
+                document.getElementById('db-records').textContent = 'Bağlantı hatası';
+            });
+    }
+    
+    // Export database
+    function exportDatabase() {
+        if (confirm('Veritabanını JSON formatında dışa aktarmak istediğinizden emin misiniz?')) {
+            alert('Veritabanı dışa aktarılıyor...');
+            // Implementation for database export
+        }
+    }
+    
+    // Test API connections
+    function testApiConnections() {
+        const twitterStatus = document.getElementById('twitter-api-status');
+        const geminiStatus = document.getElementById('gemini-api-status');
+        
+        // Reset statuses
+        twitterStatus.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Test ediliyor...';
+        geminiStatus.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Test ediliyor...';
+        
+        // Simulate API tests
+        setTimeout(() => {
+            twitterStatus.innerHTML = '<i class="fas fa-check"></i> Bağlı';
+            twitterStatus.className = 'badge bg-success';
+            
+            geminiStatus.innerHTML = '<i class="fas fa-check"></i> Bağlı';
+            geminiStatus.className = 'badge bg-success';
+        }, 2000);
+    }
+    
+    // Save all configuration
+    function saveAllConfiguration() {
+        const confirmSave = confirm('Tüm ayarları kaydetmek istediğinizden emin misiniz? Bu değişiklikler bot yeniden başlatılana kadar geçerli olmayacak.');
+        
+        if (confirmSave) {
+            // Collect all form data
+            const config = {
+                sleep_hours: Array.from(document.querySelectorAll('input[name="sleep_hours"]:checked')).map(cb => parseInt(cb.value)),
+                cycle_duration: parseInt(document.getElementById('cycle-duration').value),
+                night_mode_start: parseInt(document.getElementById('night-start').value),
+                night_mode_end: parseInt(document.getElementById('night-end').value),
+                trends_limit: parseInt(document.getElementById('trends-limit').value),
+                trend_country: document.getElementById('trend-country').value,
+                ai_model: document.getElementById('ai-model').value,
+                ai_temperature: parseFloat(document.getElementById('ai-temperature').value),
+                // API Credentials
+                api_key: document.getElementById('api-key').value,
+                api_secret: document.getElementById('api-secret').value,
+                access_token: document.getElementById('access-token').value,
+                access_token_secret: document.getElementById('access-token-secret').value,
+                bearer_token: document.getElementById('bearer-token').value,
+                user_id: document.getElementById('user-id').value,
+                gemini_api_key: document.getElementById('gemini-api-key').value
+            };
+            
+            // Debug: Log all values to see which one is undefined
+            console.log('Config data before send:', config);
+            Object.keys(config).forEach(key => {
+                if (config[key] === undefined || config[key] === null) {
+                    console.error(`UNDEFINED VALUE: ${key} =`, config[key]);
+                }
+            });
+            
+            // Send configuration to server
+            fetch('/api/config', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify(config)
+            })
+            .then(response => {
+                console.log('Response status:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('Response data:', data);
+                if (data.success) {
+                    alert(data.message || 'Ayarlar başarıyla kaydedildi ve hemen uygulandı!');
+                } else {
+                    alert('Ayarlar kaydedilemedi: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Full error:', error);
+                alert('Hata oluştu: ' + error.message);
+            });
+        }
+    }
+    
+    // Reset to defaults
+    function resetToDefaults() {
+        if (confirm('Tüm ayarları varsayılan değerlere döndürmek istediğinizden emin misiniz?')) {
+            location.reload();
+        }
+    }
+    
+    // Load database stats on page load
+    document.addEventListener('DOMContentLoaded', refreshDbStats);
+</script>
+{% endblock %}

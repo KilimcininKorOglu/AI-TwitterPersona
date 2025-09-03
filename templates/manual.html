@@ -1,0 +1,322 @@
+{% extends "base.html" %} {% block title %}Manuel Tweet - AI-TwitterPersona{%
+endblock %} {% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h5><i class="fas fa-edit"></i> Manuel Tweet Oluştur</h5>
+      </div>
+      <div class="card-body">
+        <form id="manual-tweet-form">
+          <!-- Tweet Text Area -->
+          <div class="mb-3">
+            <label for="tweet-text" class="form-label">Tweet İçeriği</label>
+            <textarea
+              class="form-control"
+              id="tweet-text"
+              name="text"
+              rows="6"
+              maxlength="280"
+              placeholder="Ne düşünüyorsun?..."
+              oninput="updateCharCount()"
+              required
+            ></textarea>
+            <div class="form-text d-flex justify-content-between">
+              <span>Tweet içeriğinizi buraya yazın</span>
+              <span id="char-count" class="text-muted">0/280</span>
+            </div>
+          </div>
+
+          <!-- Persona Selection -->
+          <div class="mb-3">
+            <label for="persona" class="form-label">Persona</label>
+            <select class="form-select" id="persona" name="persona">
+              <option value="casual" selected>
+                Casual - Gündelik ve eğlenceli
+              </option>
+              <option value="tech">Tech - Teknoloji odaklı ve analitik</option>
+              <option value="sad">Sad - Empati ve ciddiyetle</option>
+            </select>
+            <div class="form-text">
+              <small id="persona-description"
+                >Gündelik konular için eğlenceli ve özdeşleşilebilir ton</small
+              >
+            </div>
+          </div>
+
+          <!-- AI Enhancement Option -->
+          <div class="mb-3">
+            <div class="form-check">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                id="ai-enhance"
+                name="ai_enhance"
+              />
+              <label class="form-check-label" for="ai-enhance">
+                AI ile iyileştir
+                <small class="text-muted"
+                  >(Seçili persona ile tweet'i optimize eder)</small
+                >
+              </label>
+            </div>
+          </div>
+
+          <!-- Preview Section -->
+          <div class="mb-3" id="preview-section" style="display: none">
+            <label class="form-label">Önizleme</label>
+            <div class="card">
+              <div class="card-body">
+                <div class="d-flex">
+                  <div class="me-3">
+                    <i class="fab fa-twitter fa-2x text-primary"></i>
+                  </div>
+                  <div class="flex-grow-1">
+                    <h6 class="mb-1">
+                      <span id="preview-name">...</span>
+                      <small class="text-muted"
+                        >@<span id="preview-username">...</span></small
+                      >
+                    </h6>
+                    <div id="preview-text">Önizleme burada görünecek...</div>
+                    <small class="text-muted">
+                      <i class="fas fa-clock"></i> Şimdi
+                    </small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+            <button
+              type="button"
+              class="btn btn-outline-primary"
+              onclick="previewTweet()"
+            >
+              <i class="fas fa-eye"></i> Önizleme
+            </button>
+            <button
+              type="button"
+              class="btn btn-outline-warning"
+              onclick="enhanceWithAI()"
+              id="enhance-btn"
+            >
+              <i class="fas fa-magic"></i> AI ile İyileştir
+            </button>
+            <button type="submit" class="btn btn-primary" id="post-btn">
+              <i class="fas fa-paper-plane"></i> Tweet'le
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Popular Topics Row -->
+<div class="row mt-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h6><i class="fas fa-fire"></i> Popüler Konular</h6>
+      </div>
+      <div class="card-body">
+        <div id="trending-topics" class="popular-topics">
+          <div class="d-flex justify-content-center">
+            <div class="spinner-border spinner-border-sm" role="status">
+              <span class="visually-hidden">Yükleniyor...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block scripts %}
+<script>
+  // Character count update
+  function updateCharCount() {
+    const textarea = document.getElementById("tweet-text");
+    const charCount = document.getElementById("char-count");
+    const length = textarea.value.length;
+
+    charCount.textContent = `${length}/280`;
+
+    if (length > 250) {
+      charCount.className = "text-warning";
+    } else if (length > 270) {
+      charCount.className = "text-danger";
+    } else {
+      charCount.className = "text-muted";
+    }
+  }
+
+  // Persona description update
+  document.getElementById("persona").addEventListener("change", function () {
+    const descriptions = {
+      casual: "Gündelik konular için eğlenceli ve özdeşleşilebilir ton",
+      tech: "Teknoloji konularında kendinden emin ve analitik yaklaşım",
+      sad: "Ciddi konularda empati ve şefkat odaklı yaklaşım",
+    };
+
+    document.getElementById("persona-description").textContent =
+      descriptions[this.value];
+  });
+
+  // Preview tweet
+  function previewTweet() {
+    const text = document.getElementById("tweet-text").value;
+    const previewSection = document.getElementById("preview-section");
+    const previewText = document.getElementById("preview-text");
+
+    if (text.trim()) {
+      previewText.textContent = text;
+      previewSection.style.display = "block";
+    } else {
+      alert("Önce bir tweet içeriği yazın.");
+    }
+  }
+
+  // Enhance with AI
+  function enhanceWithAI() {
+    const text = document.getElementById("tweet-text").value;
+    const persona = document.getElementById("persona").value;
+    const enhanceBtn = document.getElementById("enhance-btn");
+
+    if (!text.trim()) {
+      alert("Önce bir tweet içeriği yazın.");
+      return;
+    }
+
+    enhanceBtn.innerHTML =
+      '<i class="fas fa-spinner fa-spin"></i> İyileştiriliyor...';
+    enhanceBtn.disabled = true;
+
+    // Simulate AI enhancement (replace with actual API call)
+    setTimeout(() => {
+      alert("AI iyileştirmesi henüz implement edilmedi.");
+      enhanceBtn.innerHTML = '<i class="fas fa-magic"></i> AI ile İyileştir';
+      enhanceBtn.disabled = false;
+    }, 2000);
+  }
+
+  // Form submission
+  document
+    .getElementById("manual-tweet-form")
+    .addEventListener("submit", function (e) {
+      e.preventDefault();
+
+      const formData = new FormData(this);
+      const tweetData = {
+        text: formData.get("text"),
+        persona: formData.get("persona"),
+      };
+
+      const postBtn = document.getElementById("post-btn");
+      postBtn.innerHTML =
+        '<i class="fas fa-spinner fa-spin"></i> Gönderiliyor...';
+      postBtn.disabled = true;
+
+      fetch("/api/tweet", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": document
+            .querySelector('meta[name="csrf-token"]')
+            .getAttribute("content"),
+        },
+        body: JSON.stringify(tweetData),
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          if (data.success) {
+            alert("Tweet başarıyla gönderildi!");
+            document.getElementById("tweet-text").value = "";
+            updateCharCount();
+            document.getElementById("preview-section").style.display = "none";
+          } else {
+            alert("Tweet gönderilemedi: " + data.message);
+          }
+        })
+        .catch((error) => {
+          alert("Hata oluştu: " + error.message);
+        })
+        .finally(() => {
+          postBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Tweet Gönder';
+          postBtn.disabled = false;
+        });
+    });
+
+  // Load trending topics
+  function loadTrendingTopics() {
+    fetch("/api/trends")
+      .then((response) => response.json())
+      .then((data) => {
+        const container = document.getElementById("trending-topics");
+        if (data.trends && data.trends.length > 0) {
+          container.innerHTML = data.trends
+            .map(
+              (trend) =>
+                `<small class="badge bg-secondary text-light me-1 mb-1">${trend}</small>`
+            )
+            .join("");
+        } else {
+          container.innerHTML =
+            '<small class="text-muted">Trend bulunamadı</small>';
+        }
+      })
+      .catch((error) => {
+        document.getElementById("trending-topics").innerHTML =
+          '<small class="text-muted">Trendler yüklenemedi</small>';
+      });
+  }
+
+  // Load persona settings for preview
+  function loadPersonaForPreview() {
+    fetch("/api/persona-settings")
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.success && data.settings) {
+          const nameElement = document.getElementById("preview-name");
+          const usernameElement = document.getElementById("preview-username");
+
+          // Find persona_name from settings array
+          const personaNameSetting = data.settings.find(
+            (s) => s.setting_key === "persona_name"
+          );
+
+          if (personaNameSetting && personaNameSetting.setting_value) {
+            const personaName = personaNameSetting.setting_value;
+            nameElement.textContent = personaName;
+
+            // Generate username from name
+            const username = personaName
+              .toLowerCase()
+              .replace(/ş/g, "s")
+              .replace(/ç/g, "c")
+              .replace(/ğ/g, "g")
+              .replace(/ı/g, "i")
+              .replace(/ö/g, "o")
+              .replace(/ü/g, "u")
+              .replace(/[^a-z0-9]/g, "_")
+              .replace(/_+/g, "_")
+              .replace(/^_|_$/g, "");
+
+            usernameElement.textContent = username || "kilimcininkoroglu";
+          }
+        }
+      })
+      .catch((error) => {
+        console.error("Persona settings load failed:", error);
+      });
+  }
+
+  // Load trending topics on page load
+  document.addEventListener("DOMContentLoaded", function () {
+    loadTrendingTopics();
+    loadPersonaForPreview();
+  });
+</script>
+{% endblock %}

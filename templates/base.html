@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- CSRF token removed from meta tag for security - now handled via AJAX headers -->
+    <title>{% block title %}AI-TwitterPersona{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                <i class="fas fa-robot"></i> AI-TwitterPersona
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-chart-line"></i> Anasayfa
+                </a>
+                <a class="nav-link" href="{{ url_for('tweets_history') }}">
+                    <i class="fas fa-history"></i> Tweet Geçmişi
+                </a>
+                <a class="nav-link" href="{{ url_for('manual_tweet') }}">
+                    <i class="fas fa-edit"></i> Manuel Tweet
+                </a>
+                <a class="nav-link" href="{{ url_for('configuration') }}">
+                    <i class="fas fa-cog"></i> Ayarlar
+                </a>
+                <a class="nav-link" href="{{ url_for('monitoring') }}">
+                    <i class="fas fa-eye"></i> İzleme
+                </a>
+                <a class="nav-link" href="{{ url_for('analytics') }}">
+                    <i class="fas fa-chart-bar"></i> İstatistikler
+                </a>
+                <a class="nav-link" href="{{ url_for('prompts') }}">
+                    <i class="fas fa-edit"></i> Prompt Düzenleyici
+                </a>
+            </div>
+            <div class="d-flex align-items-center">
+                {% if current_user.is_authenticated %}
+                    <span class="navbar-text text-light me-3">
+                        <i class="fas fa-user"></i> {{ current_user.id }}
+                    </span>
+                    <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm">
+                        <i class="fas fa-sign-out-alt"></i> Çıkış
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

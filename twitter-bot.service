@@ -1,0 +1,36 @@
+[Unit]
+Description=AI-TwitterPersona Bot Service
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=twitterbot
+Group=twitterbot
+WorkingDirectory=/opt/ai-twitterpersona
+Environment=PATH=/opt/ai-twitterpersona/venv/bin
+ExecStart=/opt/ai-twitterpersona/venv/bin/python main.py
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=10
+KillMode=process
+TimeoutStopSec=30
+
+# Security settings
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/ai-twitterpersona
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ai-twitterpersona-bot
+
+[Install]
+WantedBy=multi-user.target

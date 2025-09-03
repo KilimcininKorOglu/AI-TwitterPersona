@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hata {{ error_code }} - AI-TwitterPersona</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+        }
+        .error-container {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .error-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            padding: 60px 40px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+        .error-code {
+            font-size: 6rem;
+            font-weight: bold;
+            color: #dc3545;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        .error-icon {
+            font-size: 4rem;
+            color: #6c757d;
+            margin-bottom: 20px;
+        }
+        .btn-home {
+            background: linear-gradient(135deg, #1DA1F2, #1991DA);
+            border: none;
+            padding: 12px 30px;
+            border-radius: 50px;
+            font-weight: 600;
+        }
+        .btn-home:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(29, 161, 242, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-card">
+            <div class="error-icon">
+                {% if error_code == 404 %}
+                    <i class="fas fa-search"></i>
+                {% elif error_code == 500 %}
+                    <i class="fas fa-server"></i>
+                {% else %}
+                    <i class="fas fa-exclamation-triangle"></i>
+                {% endif %}
+            </div>
+            
+            <div class="error-code">{{ error_code }}</div>
+            
+            <h3 class="mb-3">{{ error_message }}</h3>
+            
+            <p class="text-muted mb-4">
+                {% if error_code == 404 %}
+                    Aradığınız sayfa bulunamadı. URL'yi kontrol edin veya ana sayfaya dönün.
+                {% elif error_code == 500 %}
+                    Sunucuda bir hata oluştu. Lütfen daha sonra tekrar deneyin.
+                {% else %}
+                    Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.
+                {% endif %}
+            </p>
+            
+            <div class="d-grid gap-2 d-md-block">
+                {% if current_user.is_authenticated %}
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-primary btn-home">
+                        <i class="fas fa-home"></i> Ana Sayfa
+                    </a>
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="btn btn-outline-primary btn-home">
+                        <i class="fas fa-sign-in-alt"></i> Giriş Yap
+                    </a>
+                {% endif %}
+                
+                <button class="btn btn-outline-secondary" onclick="history.back()">
+                    <i class="fas fa-arrow-left"></i> Geri Dön
+                </button>
+            </div>
+            
+            <hr class="my-4">
+            
+            <small class="text-muted">
+                Hata Kodu: {{ error_code }} | 
+                Zaman: Şimdi
+            </small>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

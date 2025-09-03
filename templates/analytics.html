@@ -1,0 +1,460 @@
+{% extends "base.html" %}
+
+{% block title %}İstatistikler - AI-TwitterPersona{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4">
+            <i class="fas fa-chart-bar text-primary"></i> İstatistikler
+        </h2>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card analytics-card-blue">
+            <div class="card-body text-center">
+                <i class="fas fa-tweet fa-2x mb-2"></i>
+                <h3 id="total-tweets">-</h3>
+                <p class="mb-0">Toplam Tweet</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card analytics-card-green">
+            <div class="card-body text-center">
+                <i class="fas fa-check-circle fa-2x mb-2"></i>
+                <h3 id="success-rate">-%</h3>
+                <p class="mb-0">Başarı Oranı</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card analytics-card-cyan">
+            <div class="card-body text-center">
+                <i class="fas fa-clock fa-2x mb-2"></i>
+                <h3 id="peak-hour">-</h3>
+                <p class="mb-0">En Aktif Saat</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card analytics-card-orange">
+            <div class="card-body text-center">
+                <i class="fas fa-user-circle fa-2x mb-2"></i>
+                <h3 id="most-used-persona">-</h3>
+                <p class="mb-0">En Çok Kullanılan Persona</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row 1 -->
+<div class="row mb-4">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-line"></i> Tweet Başarı Oranı (Son 30 Gün)
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="successRateChart" height="120"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-user-friends"></i> Persona Kullanımı
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="personasChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row 2 -->
+<div class="row mb-4">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-clock"></i> Saatlik Tweet Aktivitesi (Son 7 Gün)
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="hourlyActivityChart" height="120"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-trending-up"></i> Popüler Konular
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="trendingTopicsChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Export/Import Section -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-database"></i> Veri Yönetimi
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Veri Dışa Aktarımı</h6>
+                        <p class="text-muted">Tüm tweet verisini JSON formatında dışa aktar</p>
+                        <button id="exportBtn" class="btn btn-outline-info">
+                            <i class="fas fa-download"></i> Veritabanını Dışa Aktar
+                        </button>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Veri İçe Aktarımı</h6>
+                        <p class="text-muted">JSON backup dosyasından veri geri yükle</p>
+                        <div class="input-group">
+                            <input type="file" id="importFile" class="form-control" accept=".json">
+                            <button id="importBtn" class="btn btn-outline-success">
+                                <i class="fas fa-upload"></i> İçe Aktar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay" class="d-none">
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Yükleniyor...</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Chart objects
+    let successRateChart, personasChart, hourlyActivityChart, trendingTopicsChart;
+    
+    // Initialize all charts
+    initializeCharts();
+    
+    // Load analytics data
+    loadAnalyticsData();
+    
+    // Setup export/import functionality
+    setupDataManagement();
+    
+    function initializeCharts() {
+        // Success Rate Chart
+        const successRateCtx = document.getElementById('successRateChart').getContext('2d');
+        successRateChart = new Chart(successRateCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: []
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                }
+            }
+        });
+        
+        // Personas Chart (Pie)
+        const personasCtx = document.getElementById('personasChart').getContext('2d');
+        personasChart = new Chart(personasCtx, {
+            type: 'doughnut',
+            data: {
+                labels: [],
+                datasets: []
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+        
+        // Hourly Activity Chart
+        const hourlyActivityCtx = document.getElementById('hourlyActivityChart').getContext('2d');
+        hourlyActivityChart = new Chart(hourlyActivityCtx, {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: []
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+        
+        // Trending Topics Chart
+        const trendingTopicsCtx = document.getElementById('trendingTopicsChart').getContext('2d');
+        trendingTopicsChart = new Chart(trendingTopicsCtx, {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: []
+            },
+            options: {
+                responsive: true,
+                indexAxis: 'y',
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+    
+    async function loadAnalyticsData() {
+        showLoading(true);
+        
+        try {
+            // Load all analytics data in parallel
+            const [successRateData, personasData, hourlyActivityData, trendingTopicsData] = await Promise.all([
+                fetch('/api/analytics/success_rate').then(r => r.json()),
+                fetch('/api/analytics/personas').then(r => r.json()),
+                fetch('/api/analytics/hourly_activity').then(r => r.json()),
+                fetch('/api/analytics/trending_topics').then(r => r.json())
+            ]);
+            
+            // Update charts with error boundaries
+            if (successRateData.success) {
+                try {
+                    successRateChart.data = successRateData.data;
+                    successRateChart.update();
+                } catch (err) {
+                    console.error('Success rate chart update error:', err);
+                    showChartError('successRateChart', 'Başarı oranı grafiği yüklenemedi');
+                }
+                
+                // Update summary cards
+                const avgSuccessRate = successRateData.data.datasets[0]?.data?.reduce((a, b) => a + b, 0) / 
+                                     (successRateData.data.datasets[0]?.data?.length || 1);
+                document.getElementById('success-rate').textContent = avgSuccessRate.toFixed(1) + '%';
+            }
+            
+            if (personasData.success) {
+                personasChart.data = personasData.data;
+                personasChart.update();
+                
+                // Update most used persona
+                const mostUsed = personasData.statistics[0]?.persona || '-';
+                document.getElementById('most-used-persona').textContent = mostUsed;
+                
+                // Update total tweets
+                const totalTweets = personasData.statistics.reduce((sum, p) => sum + p.count, 0);
+                document.getElementById('total-tweets').textContent = totalTweets;
+            }
+            
+            if (hourlyActivityData.success) {
+                hourlyActivityChart.data = hourlyActivityData.data;
+                hourlyActivityChart.update();
+                
+                // Update peak hour
+                document.getElementById('peak-hour').textContent = 
+                    String(hourlyActivityData.peak_hour).padStart(2, '0') + ':00';
+            }
+            
+            if (trendingTopicsData.success) {
+                trendingTopicsChart.data = trendingTopicsData.data;
+                trendingTopicsChart.update();
+            }
+            
+        } catch (error) {
+            console.error('Analytics data loading error:', error);
+            showNotification('Analytics verileri yüklenirken hata oluştu', 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+    
+    function setupDataManagement() {
+        // Export functionality
+        document.getElementById('exportBtn').addEventListener('click', async function() {
+            try {
+                showLoading(true);
+                const response = await fetch('/api/export/database');
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Download JSON file
+                    const blob = new Blob([JSON.stringify(data.data, null, 2)], 
+                                        { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = data.filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    
+                    showNotification('Veri export edildi: ' + data.filename, 'success');
+                } else {
+                    showNotification('Export hatası: ' + data.message, 'error');
+                }
+            } catch (error) {
+                showNotification('Export işlemi başarısız', 'error');
+            } finally {
+                showLoading(false);
+            }
+        });
+        
+        // Import functionality
+        document.getElementById('importBtn').addEventListener('click', async function() {
+            const fileInput = document.getElementById('importFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showNotification('Lütfen import edilecek dosyayı seçin', 'warning');
+                return;
+            }
+            
+            try {
+                showLoading(true);
+                const fileContent = await file.text();
+                const importData = JSON.parse(fileContent);
+                
+                const response = await fetch('/api/import/database', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken()
+                    },
+                    body: JSON.stringify(importData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification(result.message, 'success');
+                    // Reload analytics data
+                    loadAnalyticsData();
+                } else {
+                    showNotification('Import hatası: ' + result.message, 'error');
+                }
+            } catch (error) {
+                showNotification('Import dosyası geçersiz veya hatalı', 'error');
+            } finally {
+                showLoading(false);
+                fileInput.value = '';
+            }
+        });
+    }
+    
+    function showLoading(show) {
+        const overlay = document.getElementById('loadingOverlay');
+        if (show) {
+            overlay.classList.remove('d-none');
+        } else {
+            overlay.classList.add('d-none');
+        }
+    }
+    
+    function showNotification(message, type) {
+        // Simple notification system (can be enhanced)
+        const alertClass = type === 'success' ? 'alert-success' : 
+                          type === 'error' ? 'alert-danger' : 'alert-warning';
+        
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
+        alertDiv.style.top = '20px';
+        alertDiv.style.right = '20px';
+        alertDiv.style.zIndex = '9999';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        document.body.appendChild(alertDiv);
+        
+        // Auto remove after 5 seconds
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.parentNode.removeChild(alertDiv);
+            }
+        }, 5000);
+    }
+    
+    function showChartError(canvasId, message) {
+        const canvas = document.getElementById(canvasId);
+        const container = canvas.parentElement;
+        
+        // Create error message div
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'text-center text-muted py-5';
+        errorDiv.innerHTML = `
+            <i class="fas fa-exclamation-triangle fa-3x mb-3"></i>
+            <p>${message}</p>
+            <small>Sayfayı yenilemeyi deneyin</small>
+        `;
+        
+        // Hide canvas and show error
+        canvas.style.display = 'none';
+        container.appendChild(errorDiv);
+    }
+    
+    function getCSRFToken() {
+        return document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || '';
+    }
+});
+</script>
+{% endblock %}

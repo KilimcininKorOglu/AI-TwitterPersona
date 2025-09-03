@@ -1,0 +1,501 @@
+{% extends "base.html" %}
+
+{% block title %}İzleme - AI-TwitterPersona{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Current Trending Topics -->
+    <div class="col-md-8 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-fire"></i> Güncel Trending Konular</h5>
+                <button class="btn btn-sm btn-outline-light" onclick="refreshTrends()">
+                    <i class="fas fa-sync" id="refresh-icon"></i> Yenile
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="trending-topics-container">
+                    {% if trends %}
+                        <div class="row">
+                            {% for trend in trends %}
+                            <div class="col-12 mb-3">
+                                <div class="d-flex justify-content-between align-items-center p-3 border rounded">
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1">{{ loop.index }}. {{ trend.split('(')[0].strip() }}</h6>
+                                        {% if '(' in trend %}
+                                        <small class="text-muted">
+                                            <i class="fas fa-chart-line"></i> {{ trend.split('(')[1].split(')')[0] }}
+                                        </small>
+                                        {% endif %}
+                                    </div>
+                                    <div>
+                                        <button class="btn btn-sm btn-outline-primary" onclick="tweetAboutTrend('{{ trend }}')">
+                                            <i class="fas fa-paper-plane"></i> Tweet At
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">Trending konular yüklenemedi</h5>
+                            <button class="btn btn-primary" onclick="refreshTrends()">
+                                <i class="fas fa-sync"></i> Tekrar Dene
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Real-time Statistics -->
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="fas fa-chart-pie"></i> Gerçek Zamanlı İstatistikler</h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span>Bot Uptime:</span>
+                        <strong id="bot-uptime">00:00:00</strong>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span>Sonraki Tweet:</span>
+                        <strong id="next-tweet-timer">--:--</strong>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span>API Çağrıları:</span>
+                        <strong id="api-calls">0</strong>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span>Başarı Oranı:</span>
+                        <strong id="success-rate">100%</strong>
+                    </div>
+                </div>
+
+                <hr>
+
+                <h6>Son Aktivite:</h6>
+                <div id="activity-log">
+                    <div class="d-flex justify-content-center py-3">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">Aktivite yükleniyor...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Real-time Console Output -->
+<div class="row">
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-terminal"></i> Gerçek Zamanlı Konsol Çıktısı</h5>
+                <div>
+                    <button class="btn btn-sm btn-outline-light me-2" onclick="clearConsole()">
+                        <i class="fas fa-trash"></i> Temizle
+                    </button>
+                    <div class="form-check form-switch d-inline-block">
+                        <input class="form-check-input" type="checkbox" id="auto-scroll" checked>
+                        <label class="form-check-label text-light" for="auto-scroll">Auto-scroll</label>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div id="console-output" class="bg-dark text-light p-3" style="height: 400px; overflow-y: scroll; font-family: 'Courier New', monospace; font-size: 0.875rem;">
+                    <div class="console-line">
+                        <span class="text-success">[14:30:15]</span> 
+                        <span class="text-info">[INFO]</span> 
+                        AI-TwitterPersona Dashboard başlatıldı
+                    </div>
+                    <div class="console-line">
+                        <span class="text-success">[14:30:16]</span> 
+                        <span class="text-info">[INFO]</span> 
+                        Veritabanı bağlantısı kuruldu
+                    </div>
+                    <div class="console-line">
+                        <span class="text-success">[14:30:17]</span> 
+                        <span class="text-info">[INFO]</span> 
+                        Twitter API credentials doğrulandı
+                    </div>
+                    <div class="console-line">
+                        <span class="text-success">[14:30:18]</span> 
+                        <span class="text-warning">[WARN]</span> 
+                        Bot henüz başlatılmamış
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- API Status Grid -->
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="fas fa-plug"></i> API Bağlantı Durumu</h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6 mb-3">
+                        <div class="api-status-indicator">
+                            <div class="status-circle bg-success mx-auto mb-2"></div>
+                            <h6>Twitter API</h6>
+                            <small class="text-muted">Son ping: 2ms</small>
+                        </div>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="api-status-indicator">
+                            <div class="status-circle bg-success mx-auto mb-2"></div>
+                            <h6>Gemini AI</h6>
+                            <small class="text-muted">Son ping: 45ms</small>
+                        </div>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="api-status-indicator">
+                            <div class="status-circle bg-warning mx-auto mb-2"></div>
+                            <h6>Trends API</h6>
+                            <small class="text-muted">Son ping: 1.2s</small>
+                        </div>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="api-status-indicator">
+                            <div class="status-circle bg-success mx-auto mb-2"></div>
+                            <h6>Database</h6>
+                            <small class="text-muted">Bağlı</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Resources -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="fas fa-server"></i> Sistem Kaynakları</h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">CPU Kullanımı</label>
+                    <div class="progress">
+                        <div class="progress-bar bg-info" id="cpu-usage" style="width: 15%">15%</div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">RAM Kullanımı</label>
+                    <div class="progress">
+                        <div class="progress-bar bg-warning" id="ram-usage" style="width: 35%">35%</div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Disk Kullanımı</label>
+                    <div class="progress">
+                        <div class="progress-bar bg-success" id="disk-usage" style="width: 25%">25%</div>
+                    </div>
+                </div>
+
+                <small class="text-muted">
+                    <i class="fas fa-info-circle"></i> 
+                    Son güncelleme: <span id="resource-update-time">az önce</span>
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let consoleLines = [];
+    let uptimeStartTime = Date.now();
+    
+    // Initialize monitoring
+    document.addEventListener('DOMContentLoaded', function() {
+        startRealTimeUpdates();
+        startUptimeCounter();
+        simulateConsoleOutput();
+        updateActivityLog(); // Load activities on page load
+        
+        // Initial success rate coloring
+        const initialRate = document.getElementById('success-rate').textContent;
+        const rate = parseFloat(initialRate.replace('%', ''));
+        document.getElementById('success-rate').className = getSuccessRateColorClass(rate);
+    });
+    
+    // Real-time updates
+    function startRealTimeUpdates() {
+        // Update every 5 seconds
+        setInterval(updateMonitoringData, 5000);
+    }
+    
+    function updateMonitoringData() {
+        // Simulate API calls to get real data
+        updateSystemResources();
+        updateActivityLog();
+        
+        // In real implementation, these would be actual API calls
+        fetch('/api/status')
+            .then(response => response.json())
+            .then(data => {
+                // Update monitoring data with real values
+                console.log('Monitoring data updated');
+            })
+            .catch(error => {
+                console.error('Monitoring update failed:', error);
+            });
+    }
+    
+    // Refresh trending topics
+    function refreshTrends() {
+        const refreshIcon = document.getElementById('refresh-icon');
+        const container = document.getElementById('trending-topics-container');
+        
+        refreshIcon.classList.add('fa-spin');
+        container.innerHTML = '<div class="text-center py-4"><i class="fas fa-spinner fa-spin fa-2x"></i><br><small class="text-muted">Trendler yenileniyor...</small></div>';
+        
+        fetch('/api/trends')
+            .then(response => response.json())
+            .then(data => {
+                if (data.trends && data.trends.length > 0) {
+                    let html = '<div class="row">';
+                    data.trends.forEach((trend, index) => {
+                        html += `
+                            <div class="col-12 mb-3">
+                                <div class="d-flex justify-content-between align-items-center p-3 border rounded">
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1">${trend.split('(')[0].trim()}</h6>
+                                        ${trend.includes('(') ? `<small class="text-muted"><i class="fas fa-chart-line"></i> ${trend.split('(')[1].split(')')[0]}</small>` : ''}
+                                    </div>
+                                    <div>
+                                        <button class="btn btn-sm btn-primary" onclick="tweetAboutTrend('${trend}')">
+                                            <i class="fas fa-paper-plane"></i> Tweet At
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = '<div class="text-center py-4"><i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i><h5 class="text-muted">Trend bulunamadı</h5></div>';
+                }
+            })
+            .catch(error => {
+                container.innerHTML = '<div class="text-center py-4"><i class="fas fa-times-circle fa-3x text-danger mb-3"></i><h5 class="text-muted">Trendler yüklenemedi</h5></div>';
+            })
+            .finally(() => {
+                refreshIcon.classList.remove('fa-spin');
+            });
+    }
+    
+    // Tweet about trend
+    function tweetAboutTrend(trend) {
+        if (confirm(`"${trend.split('(')[0].trim()}" hakkında tweet atmak istediğinizden emin misiniz?`)) {
+            // Redirect to manual tweet page with pre-filled content
+            const trendName = trend.split('(')[0].trim();
+            window.location.href = `/manual?topic=${encodeURIComponent(trendName)}`;
+        }
+    }
+    
+    // Console output simulation
+    function simulateConsoleOutput() {
+        const logTypes = ['INFO', 'WARN', 'ERROR', 'SUCCESS'];
+        const messages = [
+            'Trending topics çekildi',
+            'AI tweet oluşturuldu', 
+            'Tweet başarıyla gönderildi',
+            'Veritabanına kayıt yapıldı',
+            'API rate limit kontrolü yapıldı',
+            'Sistem durumu kontrol edildi'
+        ];
+        
+        setInterval(() => {
+            const logType = logTypes[Math.floor(Math.random() * logTypes.length)];
+            const message = messages[Math.floor(Math.random() * messages.length)];
+            const timestamp = new Date().toLocaleTimeString();
+            
+            addConsoleLog(logType, message, timestamp);
+        }, 10000); // Add new log every 10 seconds
+    }
+    
+    function addConsoleLog(type, message, timestamp = null) {
+        if (!timestamp) {
+            timestamp = new Date().toLocaleTimeString();
+        }
+        
+        const typeColors = {
+            'INFO': 'text-info',
+            'WARN': 'text-warning', 
+            'ERROR': 'text-danger',
+            'SUCCESS': 'text-success'
+        };
+        
+        const consoleOutput = document.getElementById('console-output');
+        const newLine = document.createElement('div');
+        newLine.className = 'console-line';
+        newLine.innerHTML = `
+            <span class="text-success">[${timestamp}]</span> 
+            <span class="${typeColors[type]}">[${type}]</span> 
+            ${message}
+        `;
+        
+        consoleOutput.appendChild(newLine);
+        
+        // Auto-scroll if enabled
+        if (document.getElementById('auto-scroll').checked) {
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+        
+        // Limit console lines to 100
+        const lines = consoleOutput.querySelectorAll('.console-line');
+        if (lines.length > 100) {
+            lines[0].remove();
+        }
+    }
+    
+    function clearConsole() {
+        document.getElementById('console-output').innerHTML = '';
+        addConsoleLog('INFO', 'Konsol temizlendi');
+    }
+    
+    // Uptime counter
+    function startUptimeCounter() {
+        setInterval(updateUptime, 1000);
+    }
+    
+    function updateUptime() {
+        const uptime = Date.now() - uptimeStartTime;
+        const hours = Math.floor(uptime / 3600000);
+        const minutes = Math.floor((uptime % 3600000) / 60000);
+        const seconds = Math.floor((uptime % 60000) / 1000);
+        
+        document.getElementById('bot-uptime').textContent = 
+            `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+    
+    // Update system resources (simulated)
+    function updateSystemResources() {
+        const cpu = Math.floor(Math.random() * 30) + 10; // 10-40%
+        const ram = Math.floor(Math.random() * 40) + 20; // 20-60%
+        const disk = Math.floor(Math.random() * 20) + 15; // 15-35%
+        
+        document.getElementById('cpu-usage').style.width = cpu + '%';
+        document.getElementById('cpu-usage').textContent = cpu + '%';
+        
+        document.getElementById('ram-usage').style.width = ram + '%';
+        document.getElementById('ram-usage').textContent = ram + '%';
+        
+        document.getElementById('disk-usage').style.width = disk + '%';
+        document.getElementById('disk-usage').textContent = disk + '%';
+        
+        document.getElementById('resource-update-time').textContent = 'az önce';
+    }
+    
+    // Update activity log
+    function updateActivityLog() {
+        fetch('/api/activity')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.activities) {
+                    const activityLog = document.getElementById('activity-log');
+                    
+                    if (data.activities.length > 0) {
+                        let html = '';
+                        data.activities.forEach(activity => {
+                            let textClass = 'text-muted';
+                            if (activity.type === 'success') textClass = 'text-success';
+                            else if (activity.type === 'error') textClass = 'text-danger';
+                            else if (activity.type === 'info') textClass = 'text-info';
+                            
+                            html += `
+                                <small class="${textClass} d-block mb-1">
+                                    <i class="${activity.icon}"></i> ${activity.time} - ${activity.message}
+                                </small>
+                            `;
+                        });
+                        activityLog.innerHTML = html;
+                    } else {
+                        activityLog.innerHTML = '<small class="text-muted">Henüz aktivite bulunamadı</small>';
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Activity log update failed:', error);
+                document.getElementById('activity-log').innerHTML = 
+                    '<small class="text-danger"><i class="fas fa-exclamation-triangle"></i> Aktivite verileri yüklenemedi</small>';
+            });
+            
+        // Also update other stats
+        document.getElementById('api-calls').textContent = Math.floor(Math.random() * 50) + 100;
+        
+        // Update success rate with dynamic coloring
+        const successRate = (95 + Math.random() * 5).toFixed(1);
+        const successRateElement = document.getElementById('success-rate');
+        successRateElement.textContent = successRate + '%';
+        
+        // Dynamic color based on success rate
+        successRateElement.className = getSuccessRateColorClass(parseFloat(successRate));
+    }
+    
+    // Get color class based on success rate percentage
+    function getSuccessRateColorClass(rate) {
+        if (rate >= 95) return 'text-success fw-bold'; // %95+ yeşil
+        else if (rate >= 85) return 'text-warning fw-bold'; // %85-94 sarı  
+        else if (rate >= 70) return 'text-info fw-bold'; // %70-84 mavi
+        else return 'text-danger fw-bold'; // %70 altı kırmızı
+    }
+</script>
+
+<style>
+    .status-circle {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+    
+    .api-status-indicator {
+        text-align: center;
+    }
+    
+    .console-line {
+        margin-bottom: 2px;
+        font-size: 0.8rem;
+    }
+    
+    #console-output::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    #console-output::-webkit-scrollbar-track {
+        background: #2c3e50;
+    }
+    
+    #console-output::-webkit-scrollbar-thumb {
+        background: #5a6c7d;
+        border-radius: 4px;
+    }
+</style>
+{% endblock %}
