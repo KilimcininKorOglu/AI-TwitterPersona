@@ -323,25 +323,28 @@
         }
     }
     
-    // Console output simulation
-    function simulateConsoleOutput() {
-        const logTypes = ['INFO', 'WARN', 'ERROR', 'SUCCESS'];
-        const messages = [
-            'Trending topics çekildi',
-            'AI tweet oluşturuldu', 
-            'Tweet başarıyla gönderildi',
-            'Veritabanına kayıt yapıldı',
-            'API rate limit kontrolü yapıldı',
-            'Sistem durumu kontrol edildi'
-        ];
-        
-        setInterval(() => {
-            const logType = logTypes[Math.floor(Math.random() * logTypes.length)];
-            const message = messages[Math.floor(Math.random() * messages.length)];
-            const timestamp = new Date().toLocaleTimeString();
-            
-            addConsoleLog(logType, message, timestamp);
-        }, 10000); // Add new log every 10 seconds
+    // Listen to real WebSocket console logs
+    if (typeof socket !== 'undefined') {
+        // Listen for console log events from the server
+        socket.on('console_log', function(data) {
+            addConsoleLog(data.type, data.message, data.timestamp);
+        });
+
+        // Listen for bot status changes
+        socket.on('bot_status', function(data) {
+            if (data.message) {
+                addConsoleLog('INFO', data.message);
+            }
+        });
+
+        // Listen for new tweet events
+        socket.on('new_tweet', function(data) {
+            const status = data.status ? 'SUCCESS' : 'ERROR';
+            const message = data.status
+                ? `Tweet gönderildi: ${data.tweet.substring(0, 50)}...`
+                : `Tweet gönderilemedi: ${data.error}`;
+            addConsoleLog(status, message);
+        });
     }
     
     function addConsoleLog(type, message, timestamp = null) {
