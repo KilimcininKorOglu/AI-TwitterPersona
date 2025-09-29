@@ -61,9 +61,8 @@ endblock %} {% block content %}
             <small>Toplam</small>
           </div>
           <div class="col-4">
-            <h4 class="text-success">
-              <span id="next-tweet-countdown">{{ config.cycle_duration }}</span>
-              dakika
+            <h4 class="text-success" id="countdown-container">
+              <span id="next-tweet-countdown">--:--</span>
             </h4>
             <small>Sonraki Tweet</small>
           </div>
@@ -127,7 +126,27 @@ endblock %} {% block content %}
       console.log('Dashboard update:', data);
       updateBotUI(data.running);
     });
+
+    // Listen for bot started event to reset countdown
+    socket.on('bot_status', function(data) {
+      if (data.running && data.message && data.message.includes('başlatıldı')) {
+        resetCountdown();
+      }
+    });
+
+    // Listen for new tweet event to reset countdown
+    socket.on('new_tweet', function(data) {
+      resetCountdown();
+    });
   }
+
+  // Countdown timer variables
+  let dashboardCountdownInterval;
+  let nextTweetTime;
+  const CYCLE_DURATION = {{ config.cycle_duration | default(30) }}; // Minutes from config
+
+  // Initialize countdown on page load
+  initializeCountdown();
 
   // Real-time updates
   setInterval(updateStatus, 10000); // Update every 10 seconds
@@ -345,5 +364,97 @@ endblock %} {% block content %}
   function exportData() {
     alert("Veri dışa aktarma özelliği gelecek güncellemede eklenecek.");
   }
+
+  // Countdown Timer Functions
+  function initializeCountdown() {
+    // Get last tweet time from localStorage or use current time
+    const lastTweetTime = localStorage.getItem('lastTweetTime');
+
+    if (lastTweetTime) {
+      const lastTime = new Date(parseInt(lastTweetTime));
+      const nextTime = new Date(lastTime.getTime() + (CYCLE_DURATION * 60 * 1000));
+
+      // Check if next time is in the future
+      if (nextTime > new Date()) {
+        nextTweetTime = nextTime;
+      } else {
+        // If past, calculate next interval from now
+        resetCountdown();
+      }
+    } else {
+      // No last tweet time, assume bot just started
+      resetCountdown();
+    }
+
+    // Start the countdown
+    startCountdown();
+  }
+
+  function resetCountdown() {
+    // Set next tweet time to CYCLE_DURATION minutes from now
+    nextTweetTime = new Date(Date.now() + (CYCLE_DURATION * 60 * 1000));
+    localStorage.setItem('lastTweetTime', Date.now().toString());
+  }
+
+  function startCountdown() {
+    // Clear any existing interval
+    if (dashboardCountdownInterval) {
+      clearInterval(dashboardCountdownInterval);
+    }
+
+    // Update immediately
+    updateCountdownDisplay();
+
+    // Update every second
+    dashboardCountdownInterval = setInterval(updateCountdownDisplay, 1000);
+  }
+
+  function updateCountdownDisplay() {
+    if (!nextTweetTime) {
+      document.getElementById('next-tweet-countdown').textContent = '--:--';
+      return;
+    }
+
+    const now = new Date();
+    const diff = nextTweetTime - now;
+
+    if (diff <= 0) {
+      // Time's up, reset countdown
+      document.getElementById('next-tweet-countdown').textContent = 'Şimdi!';
+
+      // Reset after a moment
+      setTimeout(() => {
+        resetCountdown();
+        startCountdown();
+      }, 2000);
+
+      return;
+    }
+
+    // Calculate minutes and seconds
+    const minutes = Math.floor(diff / 60000);
+    const seconds = Math.floor((diff % 60000) / 1000);
+
+    // Format as MM:SS
+    const display = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    document.getElementById('next-tweet-countdown').textContent = display;
+
+    // Change color based on remaining time
+    const countdownContainer = document.getElementById('countdown-container');
+    if (minutes < 1) {
+      countdownContainer.className = 'text-danger'; // Red when less than 1 minute
+    } else if (minutes < 5) {
+      countdownContainer.className = 'text-warning'; // Yellow when less than 5 minutes
+    } else {
+      countdownContainer.className = 'text-success'; // Green otherwise
+    }
+  }
+
+  // Clean up on page unload
+  window.addEventListener('beforeunload', function() {
+    if (dashboardCountdownInterval) {
+      clearInterval(dashboardCountdownInterval);
+    }
+  });
 </script>
 {% endblock %}
