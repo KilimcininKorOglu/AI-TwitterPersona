@@ -379,13 +379,44 @@ def update_prompt(prompt_type, prompt_text, description=None):
         if 'db' in locals() and db:
             db.close()
 
+def get_prompts():
+    """
+    Get all active prompts from the database.
+
+    Returns:
+        dict: Dictionary of prompt_type -> prompt_text for active prompts
+    """
+    try:
+        db = get_db_connection()
+        if db is None:
+            return {}
+
+        cursor = db.cursor()
+        cursor.execute("""SELECT prompt_type, prompt_text
+                         FROM prompts
+                         WHERE is_active = 1""")
+
+        rows = cursor.fetchall()
+        prompts = {row[0]: row[1] for row in rows}
+
+        return prompts
+
+    except Exception as e:
+        print(f"[-] Error fetching prompts: {e}")
+        return {}
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'db' in locals() and db:
+            db.close()
+
 def toggle_prompt_status(prompt_type):
     """
     Toggle the active status of a prompt.
-    
+
     Args:
         prompt_type (str): The type of prompt to toggle
-        
+
     Returns:
         bool: True if toggle successful, False otherwise
     """
