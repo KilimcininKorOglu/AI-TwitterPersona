@@ -32,10 +32,10 @@ endblock %} {% block content %}
             <label for="persona" class="form-label">Persona</label>
             <select class="form-select" id="persona" name="persona">
               <option value="casual" selected>
-                Casual - Gündelik ve eğlenceli
+                Gündelik - Gündelik ve eğlenceli
               </option>
-              <option value="tech">Tech - Teknoloji odaklı ve analitik</option>
-              <option value="sad">Sad - Empati ve ciddiyetle</option>
+              <option value="tech">Teknoloji - Teknoloji odaklı ve analitik</option>
+              <option value="sad">Üzgün - Empati ve ciddiyetle</option>
             </select>
             <div class="form-text">
               <small id="persona-description"
@@ -194,12 +194,53 @@ endblock %} {% block content %}
       '<i class="fas fa-spinner fa-spin"></i> İyileştiriliyor...';
     enhanceBtn.disabled = true;
 
-    // Simulate AI enhancement (replace with actual API call)
-    setTimeout(() => {
-      alert("AI iyileştirmesi henüz implement edilmedi.");
-      enhanceBtn.innerHTML = '<i class="fas fa-magic"></i> AI ile İyileştir';
-      enhanceBtn.disabled = false;
-    }, 2000);
+    // Call AI enhancement API
+    fetch("/api/enhance", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": document
+          .querySelector('meta[name="csrf-token"]')
+          .getAttribute("content"),
+      },
+      body: JSON.stringify({
+        text: text,
+        persona: persona
+      }),
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.success) {
+          // Update the tweet text with enhanced version
+          document.getElementById("tweet-text").value = data.enhanced;
+          updateCharCount();
+
+          // Show success notification
+          const notification = document.createElement('div');
+          notification.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
+          notification.style.zIndex = '9999';
+          notification.innerHTML = `
+            <i class="fas fa-check-circle"></i> Tweet AI ile iyileştirildi!
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          `;
+          document.body.appendChild(notification);
+
+          // Auto-dismiss after 3 seconds
+          setTimeout(() => {
+            notification.remove();
+          }, 3000);
+        } else {
+          alert("AI iyileştirme hatası: " + data.message);
+        }
+      })
+      .catch((error) => {
+        console.error("AI enhancement error:", error);
+        alert("AI iyileştirme sırasında hata oluştu");
+      })
+      .finally(() => {
+        enhanceBtn.innerHTML = '<i class="fas fa-magic"></i> AI ile İyileştir';
+        enhanceBtn.disabled = false;
+      });
   }
 
   // Form submission

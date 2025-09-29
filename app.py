@@ -632,6 +632,82 @@ def api_manual_tweet():
     except Exception as e:
         return jsonify({"success": False, "message": f"Hata: {str(e)}"})
 
+@app.route('/api/enhance', methods=['POST'])
+@login_required
+def api_enhance_tweet():
+    """Enhance tweet text using AI"""
+    if not API_MODULES_LOADED or not reply:
+        return jsonify({"success": False, "message": "AI modülü yüklenmedi"}), 400
+
+    original_text = request.json.get('text', '').strip()
+    persona = request.json.get('persona', 'casual')
+
+    if not original_text:
+        return jsonify({"success": False, "message": "Tweet metni gerekli"}), 400
+
+    try:
+        # Get persona prompt from database
+        prompts = database.get_prompts()
+        persona_prompt = prompts.get(persona, prompts.get('casual', ''))
+
+        # Create enhancement prompt using persona from database
+        enhancement_prompt = f"""
+{persona_prompt}
+
+Konu: {original_text}
+
+ÖNEMLİ KURALLAR:
+1. Oluşturacağın tweet'in karakter sayısı yukarıda yazıyor. asla aşmayacaksın!
+2. Tweet'i kesik bırakma, tam bir cümle olsun
+3. Karakter sayısını kendin hesapla ve limit asla geçme!
+4. Emoji ve hashtag'ler de karakter sayısına dahil
+
+Sadece tweet metnini yaz, başka hiçbir açıklama ekleme."""
+
+        # Use Gemini AI to enhance the tweet
+        import google.generativeai as genai
+        genai.configure(api_key=get_config("gemini_api_key"))
+
+        model = genai.GenerativeModel(get_config("GEMINI_MODEL", "gemini-2.5-flash"))
+        response = model.generate_content(enhancement_prompt)
+        enhanced_text = response.text.strip()
+
+        # Remove any quotes if AI wrapped it in quotes
+        if enhanced_text.startswith('"') and enhanced_text.endswith('"'):
+            enhanced_text = enhanced_text[1:-1]
+
+        # Just validate length, don't truncate - let AI handle it properly
+        if len(enhanced_text) > 280:
+            print(f"Warning: AI generated tweet longer than 280 chars: {len(enhanced_text)}")
+            # Try once more with stronger emphasis
+            enhancement_prompt_retry = f"""
+            HATA: Ürettiğin tweet {len(enhanced_text)} karakter, bu çok uzun!
+
+            {persona_prompt}
+
+            Konu: {original_text}
+
+            MUTLAKA 280 KARAKTERDEN KISA BİR TWEET YAZ!
+            Sadece tweet metnini döndür."""
+
+            response = model.generate_content(enhancement_prompt_retry)
+            enhanced_text = response.text.strip()
+            if enhanced_text.startswith('"') and enhanced_text.endswith('"'):
+                enhanced_text = enhanced_text[1:-1]
+
+        return jsonify({
+            "success": True,
+            "enhanced": enhanced_text,
+            "original": original_text
+        })
+
+    except Exception as e:
+        print(f"AI Enhancement error: {e}")
+        return jsonify({
+            "success": False,
+            "message": f"AI iyileştirme hatası: {str(e)}"
+        })
+
 @app.route('/api/trends')
 def api_trends():
     """Get current trending topics"""
