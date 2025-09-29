@@ -1027,10 +1027,22 @@ def update_stats():
                 
             cursor.execute(f"SELECT tweet_text, created_at FROM {safe_table} ORDER BY created_at DESC LIMIT 1")
             last_tweet = cursor.fetchone()
-            
+
             if last_tweet:
                 bot_stats["last_tweet"] = last_tweet[0]
-                bot_stats["last_tweet_time"] = last_tweet[1]
+                # Convert UTC to local time for display
+                try:
+                    from datetime import datetime
+                    import datetime as dt
+                    from config import get_int_config
+
+                    utc_time = datetime.strptime(last_tweet[1], "%Y-%m-%d %H:%M:%S")
+                    # Get timezone offset from config (default: UTC+3 for Turkey)
+                    tz_offset = get_int_config("TIMEZONE_OFFSET", 3)
+                    local_time = utc_time + dt.timedelta(hours=tz_offset)
+                    bot_stats["last_tweet_time"] = local_time.strftime("%Y-%m-%d %H:%M:%S")
+                except:
+                    bot_stats["last_tweet_time"] = last_tweet[1]
             
             # Get daily and total tweets count in single optimized query
             today = datetime.now().strftime("%Y-%m-%d")
@@ -2111,6 +2123,24 @@ def api_import_database():
             'message': f'Import error: {str(e)}'
         }), 500
 
+# API Status Check Endpoint
+@app.route('/api/check_status')
+@login_required
+def api_check_status():
+    """Check real-time status of all APIs"""
+    try:
+        import check_api_status
+        status = check_api_status.get_all_api_status()
+        return jsonify({
+            'success': True,
+            'status': status
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
 # Prompt Management API endpoints
 @app.route('/api/prompts', methods=['GET'])
 @login_required
@@ -2279,6 +2309,101 @@ def api_update_persona_setting(setting_key):
             'success': False,
             'message': f'Setting update error: {str(e)}'
         }), 500
+
+@app.route('/api/realtime_stats')
+@login_required
+def get_realtime_stats():
+    """Get real-time statistics for monitoring page"""
+    try:
+        import sqlite3
+        from datetime import datetime, timedelta
+
+        stats = {}
+
+        # Get success rate from database
+        conn = sqlite3.connect(database.dbName)
+        cursor = conn.cursor()
+
+        # Calculate success rate from last 100 tweets
+        cursor.execute("""
+            SELECT
+                COUNT(*) as total,
+                SUM(CASE WHEN sent = 1 THEN 1 ELSE 0 END) as successful
+            FROM (
+                SELECT sent FROM tweets
+                ORDER BY created_at DESC
+                LIMIT 100
+            )
+        """)
+        result = cursor.fetchone()
+        if result and result[0] > 0:
+            stats['success_rate'] = round((result[1] / result[0]) * 100, 1)
+        else:
+            stats['success_rate'] = 100.0
+
+        # Count API calls today
+        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        cursor.execute("""
+            SELECT COUNT(*) FROM tweets
+            WHERE created_at >= ?
+        """, (today_start.isoformat(),))
+        stats['api_calls'] = cursor.fetchone()[0]
+
+        cursor.close()
+        conn.close()
+
+        # Calculate bot uptime
+        if bot_stats["running"] and bot_stats["start_time"]:
+            start_time = datetime.fromisoformat(bot_stats["start_time"])
+            uptime_seconds = int((datetime.now() - start_time).total_seconds())
+            stats['bot_uptime'] = uptime_seconds
+        else:
+            stats['bot_uptime'] = 0
+
+        # Calculate next tweet time
+        if bot_stats["running"] and bot_stats["start_time"]:
+            cycle_minutes = get_int_config("CYCLE_DURATION_MINUTES", 60)
+
+            # Find last tweet time
+            conn = sqlite3.connect(database.dbName)
+            cursor = conn.cursor()
+            cursor.execute("SELECT created_at FROM tweets WHERE sent = 1 ORDER BY created_at DESC LIMIT 1")
+            last_tweet = cursor.fetchone()
+            cursor.close()
+            conn.close()
+
+            if last_tweet:
+                last_tweet_time = datetime.fromisoformat(last_tweet[0].replace(' ', 'T'))
+                next_run = last_tweet_time + timedelta(minutes=cycle_minutes)
+                time_remaining = (next_run - datetime.now()).total_seconds()
+
+                if time_remaining > 0:
+                    minutes = int(time_remaining // 60)
+                    seconds = int(time_remaining % 60)
+                    stats['next_tweet_time'] = f"{minutes:02d}:{seconds:02d}"
+                else:
+                    stats['next_tweet_time'] = "Yakında"
+            else:
+                stats['next_tweet_time'] = "Bekleniyor"
+        else:
+            stats['next_tweet_time'] = "--:--"
+
+        return jsonify({
+            'success': True,
+            'stats': stats
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': str(e),
+            'stats': {
+                'success_rate': 100.0,
+                'api_calls': 0,
+                'next_tweet_time': '--:--',
+                'bot_uptime': 0
+            }
+        })
 
 @app.route('/api/activity', methods=['GET'])
 def get_recent_activity():

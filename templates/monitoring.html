@@ -5,7 +5,7 @@
 {% block content %}
 <div class="row">
     <!-- Current Trending Topics -->
-    <div class="col-md-8 mb-4">
+    <div class="col-md-12 mb-4">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5><i class="fas fa-fire"></i> Güncel Trending Konular</h5>
@@ -50,49 +50,43 @@
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Real-time Statistics -->
-    <div class="col-md-4 mb-4">
+<!-- API Status Grid -->
+<div class="row">
+    <div class="col-md-12 mb-4">
         <div class="card">
             <div class="card-header">
-                <h6><i class="fas fa-chart-pie"></i> Gerçek Zamanlı İstatistikler</h6>
+                <h5><i class="fas fa-plug"></i> API Bağlantı Durumu</h5>
             </div>
             <div class="card-body">
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between">
-                        <span>Bot Uptime:</span>
-                        <strong id="bot-uptime">00:00:00</strong>
+                <div class="row text-center" id="api-status-grid">
+                    <div class="col-md-3 col-6 mb-3">
+                        <div class="api-status-indicator">
+                            <div id="twitter-status" class="status-circle bg-secondary mx-auto mb-2"></div>
+                            <h6>Twitter API</h6>
+                            <small id="twitter-ping" class="text-muted">Kontrol ediliyor...</small>
+                        </div>
                     </div>
-                </div>
-                
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between">
-                        <span>Sonraki Tweet:</span>
-                        <strong id="next-tweet-timer">--:--</strong>
+                    <div class="col-md-3 col-6 mb-3">
+                        <div class="api-status-indicator">
+                            <div id="gemini-status" class="status-circle bg-secondary mx-auto mb-2"></div>
+                            <h6>Gemini AI</h6>
+                            <small id="gemini-ping" class="text-muted">Kontrol ediliyor...</small>
+                        </div>
                     </div>
-                </div>
-                
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between">
-                        <span>API Çağrıları:</span>
-                        <strong id="api-calls">0</strong>
+                    <div class="col-md-3 col-6 mb-3">
+                        <div class="api-status-indicator">
+                            <div id="trends-status" class="status-circle bg-secondary mx-auto mb-2"></div>
+                            <h6>Trends API</h6>
+                            <small id="trends-ping" class="text-muted">Kontrol ediliyor...</small>
+                        </div>
                     </div>
-                </div>
-                
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between">
-                        <span>Başarı Oranı:</span>
-                        <strong id="success-rate">100%</strong>
-                    </div>
-                </div>
-
-                <hr>
-
-                <h6>Son Aktivite:</h6>
-                <div id="activity-log">
-                    <div class="d-flex justify-content-center py-3">
-                        <div class="spinner-border spinner-border-sm text-primary" role="status">
-                            <span class="visually-hidden">Aktivite yükleniyor...</span>
+                    <div class="col-md-3 col-6 mb-3">
+                        <div class="api-status-indicator">
+                            <div id="database-status" class="status-circle bg-secondary mx-auto mb-2"></div>
+                            <h6>Database</h6>
+                            <small id="database-ping" class="text-muted">Kontrol ediliyor...</small>
                         </div>
                     </div>
                 </div>
@@ -120,105 +114,26 @@
             <div class="card-body p-0">
                 <div id="console-output" class="bg-dark text-light p-3" style="height: 400px; overflow-y: scroll; font-family: 'Courier New', monospace; font-size: 0.875rem;">
                     <div class="console-line">
-                        <span class="text-success">[14:30:15]</span> 
-                        <span class="text-info">[INFO]</span> 
+                        <span class="text-success">[14:30:15]</span>
+                        <span class="text-info">[INFO]</span>
                         AI-TwitterPersona Dashboard başlatıldı
                     </div>
                     <div class="console-line">
-                        <span class="text-success">[14:30:16]</span> 
-                        <span class="text-info">[INFO]</span> 
+                        <span class="text-success">[14:30:16]</span>
+                        <span class="text-info">[INFO]</span>
                         Veritabanı bağlantısı kuruldu
                     </div>
                     <div class="console-line">
-                        <span class="text-success">[14:30:17]</span> 
-                        <span class="text-info">[INFO]</span> 
+                        <span class="text-success">[14:30:17]</span>
+                        <span class="text-info">[INFO]</span>
                         Twitter API credentials doğrulandı
                     </div>
                     <div class="console-line">
-                        <span class="text-success">[14:30:18]</span> 
-                        <span class="text-warning">[WARN]</span> 
+                        <span class="text-success">[14:30:18]</span>
+                        <span class="text-warning">[WARN]</span>
                         Bot henüz başlatılmamış
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- API Status Grid -->
-<div class="row">
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <h6><i class="fas fa-plug"></i> API Bağlantı Durumu</h6>
-            </div>
-            <div class="card-body">
-                <div class="row text-center">
-                    <div class="col-6 mb-3">
-                        <div class="api-status-indicator">
-                            <div class="status-circle bg-success mx-auto mb-2"></div>
-                            <h6>Twitter API</h6>
-                            <small class="text-muted">Son ping: 2ms</small>
-                        </div>
-                    </div>
-                    <div class="col-6 mb-3">
-                        <div class="api-status-indicator">
-                            <div class="status-circle bg-success mx-auto mb-2"></div>
-                            <h6>Gemini AI</h6>
-                            <small class="text-muted">Son ping: 45ms</small>
-                        </div>
-                    </div>
-                    <div class="col-6 mb-3">
-                        <div class="api-status-indicator">
-                            <div class="status-circle bg-warning mx-auto mb-2"></div>
-                            <h6>Trends API</h6>
-                            <small class="text-muted">Son ping: 1.2s</small>
-                        </div>
-                    </div>
-                    <div class="col-6 mb-3">
-                        <div class="api-status-indicator">
-                            <div class="status-circle bg-success mx-auto mb-2"></div>
-                            <h6>Database</h6>
-                            <small class="text-muted">Bağlı</small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- System Resources -->
-    <div class="col-md-6 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <h6><i class="fas fa-server"></i> Sistem Kaynakları</h6>
-            </div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <label class="form-label">CPU Kullanımı</label>
-                    <div class="progress">
-                        <div class="progress-bar bg-info" id="cpu-usage" style="width: 15%">15%</div>
-                    </div>
-                </div>
-                
-                <div class="mb-3">
-                    <label class="form-label">RAM Kullanımı</label>
-                    <div class="progress">
-                        <div class="progress-bar bg-warning" id="ram-usage" style="width: 35%">35%</div>
-                    </div>
-                </div>
-                
-                <div class="mb-3">
-                    <label class="form-label">Disk Kullanımı</label>
-                    <div class="progress">
-                        <div class="progress-bar bg-success" id="disk-usage" style="width: 25%">25%</div>
-                    </div>
-                </div>
-
-                <small class="text-muted">
-                    <i class="fas fa-info-circle"></i> 
-                    Son güncelleme: <span id="resource-update-time">az önce</span>
-                </small>
             </div>
         </div>
     </div>
@@ -228,48 +143,69 @@
 {% block scripts %}
 <script>
     let consoleLines = [];
-    let uptimeStartTime = Date.now();
     
     // Initialize monitoring
     document.addEventListener('DOMContentLoaded', function() {
-        startRealTimeUpdates();
-        startUptimeCounter();
-        // simulateConsoleOutput(); // Removed - will use real WebSocket data
-        updateActivityLog(); // Load activities on page load
+        checkAPIStatus(); // Check API status on page load
 
-        // Initial success rate coloring
-        const initialRate = document.getElementById('success-rate').textContent;
-        const rate = parseFloat(initialRate.replace('%', ''));
-        document.getElementById('success-rate').className = getSuccessRateColorClass(rate);
+        // Set up periodic API status checks
+        setInterval(checkAPIStatus, 30000); // Check API status every 30 seconds
 
         // Clear mock data from console
         document.getElementById('console-output').innerHTML = '';
         addConsoleLog('INFO', 'Gerçek zamanlı izleme başlatıldı');
     });
     
-    // Real-time updates
-    function startRealTimeUpdates() {
-        // Update every 5 seconds
-        setInterval(updateMonitoringData, 5000);
+    // Check API Status
+    function checkAPIStatus() {
+        fetch('/api/check_status', {
+            headers: {
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateAPIStatusDisplay(data.status);
+            }
+        })
+        .catch(error => {
+            console.error('API status check error:', error);
+        });
     }
-    
-    function updateMonitoringData() {
-        // Simulate API calls to get real data
-        updateSystemResources();
-        updateActivityLog();
-        
-        // In real implementation, these would be actual API calls
-        fetch('/api/status')
-            .then(response => response.json())
-            .then(data => {
-                // Update monitoring data with real values
-                console.log('Monitoring data updated');
-            })
-            .catch(error => {
-                console.error('Monitoring update failed:', error);
-            });
+
+    function updateAPIStatusDisplay(status) {
+        // Update Twitter API
+        updateSingleAPIStatus('twitter', status.twitter);
+        // Update Gemini AI
+        updateSingleAPIStatus('gemini', status.gemini);
+        // Update Trends API
+        updateSingleAPIStatus('trends', status.trends);
+        // Update Database
+        updateSingleAPIStatus('database', status.database);
     }
-    
+
+    function updateSingleAPIStatus(apiName, apiStatus) {
+        const statusElement = document.getElementById(`${apiName}-status`);
+        const pingElement = document.getElementById(`${apiName}-ping`);
+
+        if (statusElement && pingElement) {
+            // Remove all status classes
+            statusElement.classList.remove('bg-success', 'bg-warning', 'bg-danger', 'bg-secondary');
+
+            if (apiStatus.status === 'success') {
+                statusElement.classList.add('bg-success');
+                pingElement.textContent = apiStatus.ping ? `Ping: ${apiStatus.ping}ms` : 'Bağlı';
+            } else if (apiStatus.status === 'warning') {
+                statusElement.classList.add('bg-warning');
+                pingElement.textContent = apiStatus.message || 'Yavaş';
+            } else {
+                statusElement.classList.add('bg-danger');
+                pingElement.textContent = apiStatus.message || 'Bağlantı yok';
+            }
+        }
+    }
+
     // Refresh trending topics
     function refreshTrends() {
         const refreshIcon = document.getElementById('refresh-icon');
@@ -387,92 +323,6 @@
         addConsoleLog('INFO', 'Konsol temizlendi');
     }
     
-    // Uptime counter
-    function startUptimeCounter() {
-        setInterval(updateUptime, 1000);
-    }
-    
-    function updateUptime() {
-        const uptime = Date.now() - uptimeStartTime;
-        const hours = Math.floor(uptime / 3600000);
-        const minutes = Math.floor((uptime % 3600000) / 60000);
-        const seconds = Math.floor((uptime % 60000) / 1000);
-        
-        document.getElementById('bot-uptime').textContent = 
-            `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    }
-    
-    // Update system resources (simulated)
-    function updateSystemResources() {
-        const cpu = Math.floor(Math.random() * 30) + 10; // 10-40%
-        const ram = Math.floor(Math.random() * 40) + 20; // 20-60%
-        const disk = Math.floor(Math.random() * 20) + 15; // 15-35%
-        
-        document.getElementById('cpu-usage').style.width = cpu + '%';
-        document.getElementById('cpu-usage').textContent = cpu + '%';
-        
-        document.getElementById('ram-usage').style.width = ram + '%';
-        document.getElementById('ram-usage').textContent = ram + '%';
-        
-        document.getElementById('disk-usage').style.width = disk + '%';
-        document.getElementById('disk-usage').textContent = disk + '%';
-        
-        document.getElementById('resource-update-time').textContent = 'az önce';
-    }
-    
-    // Update activity log
-    function updateActivityLog() {
-        fetch('/api/activity')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success && data.activities) {
-                    const activityLog = document.getElementById('activity-log');
-                    
-                    if (data.activities.length > 0) {
-                        let html = '';
-                        data.activities.forEach(activity => {
-                            let textClass = 'text-muted';
-                            if (activity.type === 'success') textClass = 'text-success';
-                            else if (activity.type === 'error') textClass = 'text-danger';
-                            else if (activity.type === 'info') textClass = 'text-info';
-                            
-                            html += `
-                                <small class="${textClass} d-block mb-1">
-                                    <i class="${activity.icon}"></i> ${activity.time} - ${activity.message}
-                                </small>
-                            `;
-                        });
-                        activityLog.innerHTML = html;
-                    } else {
-                        activityLog.innerHTML = '<small class="text-muted">Henüz aktivite bulunamadı</small>';
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('Activity log update failed:', error);
-                document.getElementById('activity-log').innerHTML = 
-                    '<small class="text-danger"><i class="fas fa-exclamation-triangle"></i> Aktivite verileri yüklenemedi</small>';
-            });
-            
-        // Also update other stats
-        document.getElementById('api-calls').textContent = Math.floor(Math.random() * 50) + 100;
-        
-        // Update success rate with dynamic coloring
-        const successRate = (95 + Math.random() * 5).toFixed(1);
-        const successRateElement = document.getElementById('success-rate');
-        successRateElement.textContent = successRate + '%';
-        
-        // Dynamic color based on success rate
-        successRateElement.className = getSuccessRateColorClass(parseFloat(successRate));
-    }
-    
-    // Get color class based on success rate percentage
-    function getSuccessRateColorClass(rate) {
-        if (rate >= 95) return 'text-success fw-bold'; // %95+ yeşil
-        else if (rate >= 85) return 'text-warning fw-bold'; // %85-94 sarı  
-        else if (rate >= 70) return 'text-info fw-bold'; // %70-84 mavi
-        else return 'text-danger fw-bold'; // %70 altı kırmızı
-    }
 </script>
 
 <style>

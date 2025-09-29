@@ -185,9 +185,11 @@
     }
     
     function toggleFullTweet(element) {
-        const content = element.previousElementSibling.querySelector('.tweet-content');
+        event.preventDefault(); // Prevent default link behavior
+        const td = element.closest('td');
+        const content = td.querySelector('.tweet-content');
         const fullText = element.dataset.full;
-        
+
         if (element.textContent === 'Devamını göster') {
             content.textContent = fullText;
             element.textContent = 'Kısalt';
@@ -195,6 +197,7 @@
             content.textContent = fullText.substring(0, 100) + (fullText.length > 100 ? '...' : '');
             element.textContent = 'Devamını göster';
         }
+        return false; // Prevent page jump
     }
     
     function retryTweet(tweetId) {
