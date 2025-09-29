@@ -131,15 +131,28 @@ def detect_topic_type(user_input):
     """
     Classify the input topic into one of three persona categories: tech, casual, or sad.
     Uses caching to avoid re-classifying the same topics and improve performance.
-    
+
     Args:
         user_input (str): The topic/prompt to be classified
-        
+
     Returns:
         str: One of 'tech', 'casual', or 'sad' - defaults to 'casual' on any error
     """
+    # Extract hashtag from complex prompt if present
+    import re
+    hashtag_pattern = r'#[\w\u00C0-\u024F\u1E00-\u1EFF]+'
+    hashtag_match = re.search(hashtag_pattern, user_input)
+
+    if hashtag_match:
+        # Use only the hashtag for classification
+        topic_to_classify = hashtag_match.group(0)
+        print(f"[+] Extracted hashtag for classification: {topic_to_classify}")
+    else:
+        # Use the original input if no hashtag found
+        topic_to_classify = user_input
+
     # Normalize input for consistent cache lookup
-    normalized = user_input.strip().lower()
+    normalized = topic_to_classify.strip().lower()
     
     # Check cache first to avoid unnecessary API calls
     if normalized in topic_cache:
@@ -180,9 +193,13 @@ def detect_topic_type(user_input):
 
     try:
         # Create classification prompt for Gemini AI
-        prompt = f"""Aşağıdaki tweet konusunu şu kategorilerden birine sınıflandır: tech, casual, or sad.
-Tweet: "{user_input}"
-Sadece kategori adını döndür."""
+        prompt = f"""Aşağıdaki hashtag veya konuyu analiz et ve şu kategorilerden birine sınıflandır:
+- tech: Teknoloji, bilim, yazılım, startup, kripto, AI konuları
+- sad: Üzücü haberler, ölüm, hastalık, felaket, kayıplar
+- casual: Diğer tüm konular (günlük hayat, spor, siyaset, magazin, eğlence, sosyal medya trendleri)
+
+Konu: "{topic_to_classify}"
+Sadece kategori adını döndür (tech/sad/casual)."""
         
         # Get classification from Gemini AI
         resp = model.generate_content(prompt)
@@ -282,14 +299,40 @@ def generate_reply(user_input):
     # Start a new conversation with Gemini AI
     convo = model.start_chat(history=[])
     
+    # Extract hashtag if present for better context
+    import re
+    hashtag_pattern = r'#[\w\u00C0-\u024F\u1E00-\u1EFF]+'
+    hashtag_match = re.search(hashtag_pattern, user_input)
+
+    if hashtag_match:
+        hashtag = hashtag_match.group(0)
+        # Create context-aware prompt
+        context_prompt = f"""{persona}
+
+Şu an trending olan hashtag: {hashtag}
+Bu hashtag hakkında, bu hashtag'i kullanarak bir tweet yaz.
+Hashtag'in konusuna uygun, alakalı bir içerik üret.
+
+Önemli:
+- Hashtag'in konusuyla alakalı tweet yaz
+- Eğer hashtag bir kişi ismiyse, o kişi hakkında yorum yap
+- Eğer hashtag bir spor maçıysa, maç hakkında yorum yap
+- Eğer hashtag bir olayla ilgiliyse, o olay hakkında yorum yap
+- Maksimum 280 karakter, Türkçe
+
+Hashtag: {hashtag}"""
+    else:
+        # Fallback to original format if no hashtag
+        context_prompt = persona + "\nKonu: " + user_input
+
     # Generate tweet using persona prompt and topic, with configured AI parameters
     try:
         resp = convo.send_message(
-            persona + "\nTopic: " + user_input,
+            context_prompt,
             generation_config={
                 "temperature": AI_TEMPERATURE,     # Controls creativity/randomness
                 "top_p": AI_TOP_P,                # Nucleus sampling parameter
-                "top_k": AI_TOP_K,                # Top-k sampling parameter  
+                "top_k": AI_TOP_K,                # Top-k sampling parameter
                 "max_output_tokens": None         # No limit on response length
             }
         )

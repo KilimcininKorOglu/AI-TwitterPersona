@@ -1215,24 +1215,96 @@ def run_bot_thread():
         return
 
     try:
-        # Use main.run_bot() but with modified loop to check bot_stop_event
+        # Import required modules
         import time
+        import random
         from config import get_int_config
 
         CYCLE_DURATION_MINUTES = get_int_config("CYCLE_DURATION_MINUTES", 30)
 
+        # Initialize bot modules first
+        if hasattr(main, 'initialize_bot_modules'):
+            if not main.initialize_bot_modules():
+                print("[ERROR] Could not initialize bot modules")
+                with bot_lock:
+                    bot_running = False
+                return
+
         while not bot_stop_event.is_set():
             try:
-                # Run one iteration of the bot logic
+                prompt = ""
+                topic = ""
+
+                # Check if it's trending time
                 if main.isTrendingTime():
-                    main.trending_tweets()
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Getting Trending Topics...")
+                    broadcast_console_log('INFO', 'Getting trending topics...')
+
+                    # Get trending topics
+                    topic = main.trending_tweets()
+                    if not topic:
+                        print("[!] No trending topics found")
+                        broadcast_console_log('WARNING', 'No trending topics found')
+                        # Wait before retry
+                        if bot_stop_event.wait(timeout=60):
+                            break
+                        continue
+
+                    # Create prompt for AI
+                    prompt += f"Bunlar tweet detayları. [format- konu, tweet sayısı, tweet URL] {topic}. Tüm bu detayları tweet bilgin için kullan, referans için değil."
+                    context = "Kullanıcı tarafından ek bağlam eklenmedi. Konu detaylarını kullanarak bağlamı ve amacı anlamalısın. Tweet referansı için detayları kullan."
+                    prompt += context + " " + str(topic)
                 else:
-                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Sleep hour - no tweets")
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Sleep hour - using general prompt")
+                    broadcast_console_log('INFO', 'Sleep hour - using general prompt')
+                    prompt = "En ilgi çekici ve güncel konuda bir tweet oluştur."
+
+                # Generate AI tweet
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Generating Reply...Topic: {prompt[:100]}...")
+                broadcast_console_log('INFO', f'Generating AI tweet for: {str(topic)[:100] if topic else "general topic"}')
+
+                if hasattr(main, 'reply') and main.reply:
+                    tweet = main.reply.generate_reply(prompt)
+                else:
+                    # Fallback if reply module not available
+                    import reply
+                    tweet = reply.generate_reply(prompt)
+
+                if tweet:
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Tweet generated: {tweet}")
+                    broadcast_console_log('SUCCESS', f'Tweet generated: {tweet}')
+
+                    # Post tweet
+                    status = main.scheduled_tweet(tweet)
+
+                    # Save to database
+                    database.save_tweets(tweet=tweet, tweet_type="tweet", status=status)
+
+                    if status:
+                        print(f"[{datetime.now().strftime('%H:%M:%S')}] Tweet posted successfully!")
+                        broadcast_console_log('SUCCESS', 'Tweet posted successfully!')
+                        bot_stats["last_tweet"] = tweet[:50] + "..." if len(tweet) > 50 else tweet
+                        bot_stats["last_tweet_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+                        # Emit new tweet event
+                        socketio.emit('new_tweet', {
+                            'tweet': tweet,
+                            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        })
+                    else:
+                        print(f"[{datetime.now().strftime('%H:%M:%S')}] Failed to post tweet")
+                        broadcast_console_log('ERROR', 'Failed to post tweet')
+                else:
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Failed to generate tweet")
+                    broadcast_console_log('ERROR', 'Failed to generate tweet')
 
                 # Update stats
                 bot_stats["last_check"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-                # Use event.wait() for interruptible sleep
+                # Sleep with interruptible wait
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Sleeping for {CYCLE_DURATION_MINUTES} minutes...")
+                broadcast_console_log('INFO', f'Next tweet in {CYCLE_DURATION_MINUTES} minutes')
+
                 if bot_stop_event.wait(timeout=CYCLE_DURATION_MINUTES * 60):
                     break  # Event was set during wait, exit loop
 
@@ -1250,6 +1322,7 @@ def run_bot_thread():
         with bot_lock:
             bot_running = False
         print("[INFO] Bot thread terminated gracefully")
+        broadcast_console_log('INFO', 'Bot stopped')
 
 # SocketIO Events
 @socketio.on('connect')
