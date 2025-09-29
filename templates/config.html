@@ -260,21 +260,21 @@
                 <div class="mb-3">
                     <div class="d-flex justify-content-between align-items-center">
                         <span><i class="fab fa-twitter"></i> Twitter API</span>
-                        <span class="badge bg-success" id="twitter-api-status">
-                            <i class="fas fa-check"></i> Bağlı
+                        <span class="badge bg-secondary" id="twitter-api-status">
+                            <i class="fas fa-question"></i> Test edilmedi
                         </span>
                     </div>
-                    <small class="text-muted">Son test: 2 dakika önce</small>
+                    <small class="text-muted" id="twitter-api-test-time">Son test: -</small>
                 </div>
-                
+
                 <div class="mb-3">
                     <div class="d-flex justify-content-between align-items-center">
                         <span><i class="fas fa-brain"></i> Gemini AI API</span>
-                        <span class="badge bg-success" id="gemini-api-status">
-                            <i class="fas fa-check"></i> Bağlı
+                        <span class="badge bg-secondary" id="gemini-api-status">
+                            <i class="fas fa-question"></i> Test edilmedi
                         </span>
                     </div>
-                    <small class="text-muted">Son test: 1 dakika önce</small>
+                    <small class="text-muted" id="gemini-api-test-time">Son test: -</small>
                 </div>
                 
                 <div class="d-grid gap-2">
@@ -353,19 +353,52 @@
     function testApiConnections() {
         const twitterStatus = document.getElementById('twitter-api-status');
         const geminiStatus = document.getElementById('gemini-api-status');
-        
+
         // Reset statuses
         twitterStatus.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Test ediliyor...';
         geminiStatus.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Test ediliyor...';
-        
-        // Simulate API tests
-        setTimeout(() => {
-            twitterStatus.innerHTML = '<i class="fas fa-check"></i> Bağlı';
-            twitterStatus.className = 'badge bg-success';
-            
-            geminiStatus.innerHTML = '<i class="fas fa-check"></i> Bağlı';
-            geminiStatus.className = 'badge bg-success';
-        }, 2000);
+
+        // Make real API check
+        fetch('/api/check_status', {
+            headers: {
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.status) {
+                // Update Twitter API status
+                if (data.status.twitter.status === 'success') {
+                    twitterStatus.innerHTML = `<i class="fas fa-check"></i> Bağlı (${data.status.twitter.ping}ms)`;
+                    twitterStatus.className = 'badge bg-success';
+                } else {
+                    twitterStatus.innerHTML = `<i class="fas fa-times"></i> ${data.status.twitter.message || 'Bağlantı Hatası'}`;
+                    twitterStatus.className = 'badge bg-danger';
+                }
+
+                // Update Gemini API status
+                if (data.status.gemini.status === 'success') {
+                    geminiStatus.innerHTML = `<i class="fas fa-check"></i> Bağlı (${data.status.gemini.ping}ms)`;
+                    geminiStatus.className = 'badge bg-success';
+                } else {
+                    geminiStatus.innerHTML = `<i class="fas fa-times"></i> ${data.status.gemini.message || 'Bağlantı Hatası'}`;
+                    geminiStatus.className = 'badge bg-danger';
+                }
+
+                // Update last test time for each API
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+                document.getElementById('twitter-api-test-time').textContent = `Son test: ${timeStr}`;
+                document.getElementById('gemini-api-test-time').textContent = `Son test: ${timeStr}`;
+            }
+        })
+        .catch(error => {
+            console.error('API test error:', error);
+            twitterStatus.innerHTML = '<i class="fas fa-exclamation"></i> Test Hatası';
+            twitterStatus.className = 'badge bg-warning';
+            geminiStatus.innerHTML = '<i class="fas fa-exclamation"></i> Test Hatası';
+            geminiStatus.className = 'badge bg-warning';
+        });
     }
     
     // Save all configuration
