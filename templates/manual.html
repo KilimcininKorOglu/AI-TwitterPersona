@@ -390,6 +390,20 @@ endblock %} {% block content %}
   document.addEventListener("DOMContentLoaded", function () {
     loadTrendingTopics();
     loadPersonaForPreview();
+
+    // Check if there's a topic in URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const topic = urlParams.get('topic');
+
+    if (topic) {
+      // Extract hashtag from the topic parameter
+      const hashtagMatch = topic.match(/#[a-zA-Z0-9ğüşıöçĞÜŞİÖÇ]+/);
+      if (hashtagMatch) {
+        const hashtag = hashtagMatch[0];
+        document.getElementById("tweet-text").value = hashtag;
+        updateCharCount();
+      }
+    }
   });
 </script>
 {% endblock %}
