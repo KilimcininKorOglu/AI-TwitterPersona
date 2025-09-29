@@ -7,6 +7,7 @@ Bu dokuman AI-TwitterPersona Dashboard'u production ortamında deploy etmek içi
 ### 1. Manuel Deployment (Linux Server)
 
 #### Gereksinimler
+
 ```bash
 # Python 3.11+ ve pip
 sudo apt update
@@ -20,7 +21,9 @@ pip install gunicorn eventlet
 ```
 
 #### Adımlar
+
 1. **Sunucuya deployment:**
+
 ```bash
 # Dosyaları sunucuya kopyala
 scp -r AI-TwitterPersona/ user@server:/opt/ai-twitterpersona/
@@ -34,6 +37,7 @@ pip install gunicorn eventlet
 ```
 
 2. **Environment konfigürasyonu:**
+
 ```bash
 # token.env dosyasını düzenle
 cp token.env.example token.env
@@ -49,6 +53,7 @@ nano token.env
 ```
 
 3. **Systemd servis kurulumu:**
+
 ```bash
 # Service dosyasını düzenle
 sudo cp systemd_service.service /etc/systemd/system/ai-twitterpersona.service
@@ -67,6 +72,7 @@ sudo systemctl status ai-twitterpersona
 ```
 
 4. **Nginx reverse proxy:**
+
 ```bash
 # Nginx konfigürasyonu
 sudo nano /etc/nginx/sites-available/ai-twitterpersona
@@ -99,6 +105,7 @@ sudo systemctl reload nginx
 ### 2. Docker Deployment
 
 #### Basit Docker
+
 ```bash
 # Image build et
 docker build -t ai-twitterpersona-dashboard .
@@ -115,6 +122,7 @@ docker run -d \
 ```
 
 #### Docker Compose (Önerilen)
+
 ```bash
 # Environment ayarla
 cp token.env.example token.env
@@ -130,6 +138,7 @@ docker-compose logs -f ai-twitterpersona
 ### 3. Cloud Deployment
 
 #### Heroku
+
 ```bash
 # Heroku CLI kurulu olmalı
 heroku create ai-twitterpersona-dashboard
@@ -147,6 +156,7 @@ git push heroku main
 ```
 
 #### AWS/DigitalOcean/VPS
+
 - Docker Compose dosyasını kullan
 - Load balancer ve auto-scaling için kubernetes kullan
 - Database için managed PostgreSQL kullan
@@ -154,6 +164,7 @@ git push heroku main
 ## 🔒 Güvenlik Konfigürasyonu
 
 ### 1. SSL/TLS (HTTPS)
+
 ```bash
 # Let's Encrypt ile SSL sertifikası
 sudo apt install certbot python3-certbot-nginx
@@ -164,6 +175,7 @@ sudo systemctl enable certbot.timer
 ```
 
 ### 2. Güvenlik Headers
+
 ```nginx
 # Nginx'e ekle
 add_header X-Frame-Options DENY;
@@ -173,6 +185,7 @@ add_header Strict-Transport-Security "max-age=31536000; includeSubDomains";
 ```
 
 ### 3. Firewall
+
 ```bash
 # UFW ile port yönetimi
 sudo ufw allow 22    # SSH
@@ -184,6 +197,7 @@ sudo ufw enable
 ## 📊 Monitoring ve Logging
 
 ### 1. Log Management
+
 ```bash
 # Log rotasyonu
 sudo nano /etc/logrotate.d/ai-twitterpersona
@@ -199,6 +213,7 @@ sudo nano /etc/logrotate.d/ai-twitterpersona
 ```
 
 ### 2. Health Monitoring
+
 ```bash
 # Cron job ile health check
 crontab -e
@@ -208,6 +223,7 @@ crontab -e
 ```
 
 ### 3. Performance Monitoring
+
 - **Grafana + Prometheus** ile metrikleri takip et
 - **Uptime monitoring** servisleri kullan (UptimeRobot, Pingdom)
 - **Log aggregation** (ELK Stack, Loki)
@@ -215,6 +231,7 @@ crontab -e
 ## 🔧 Maintenance
 
 ### 1. Güncelleme
+
 ```bash
 # Servis durdur
 sudo systemctl stop ai-twitterpersona
@@ -232,12 +249,14 @@ sudo systemctl start ai-twitterpersona
 ```
 
 ### 2. Backup
+
 ```bash
 # Database ve konfigürasyon backup'ı
 tar -czf backup-$(date +%Y%m%d).tar.gz token.env twitter.db logs/
 ```
 
 ### 3. Sorun Giderme
+
 ```bash
 # Servis durumu
 sudo systemctl status ai-twitterpersona
@@ -253,15 +272,18 @@ tail -f logs/gunicorn_error.log
 ## ⚡ Performance Optimizasyonu
 
 ### 1. Database
+
 - SQLite yerine PostgreSQL kullan (çoklu user için)
 - Database indexleri ekle
 - Connection pooling aktif et
 
 ### 2. Caching
+
 - Redis ile session ve cache yönetimi
 - CDN kullan (CloudFlare, AWS CloudFront)
 
 ### 3. Load Balancing
+
 - Nginx ile load balancing
 - Multi-instance deployment
 - Auto-scaling konfigürasyonu

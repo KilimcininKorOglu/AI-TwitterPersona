@@ -7,6 +7,7 @@ This document contains all the necessary steps to deploy the AI-TwitterPersona D
 ### 1. Manual Deployment (Linux Server)
 
 #### Requirements
+
 ```bash
 # Python 3.11+ and pip
 sudo apt update
@@ -20,7 +21,9 @@ pip install gunicorn eventlet
 ```
 
 #### Steps
+
 1. **Server deployment:**
+
 ```bash
 # Copy files to server
 scp -r AI-TwitterPersona/ user@server:/opt/ai-twitterpersona/
@@ -34,6 +37,7 @@ pip install gunicorn eventlet
 ```
 
 2. **Environment configuration:**
+
 ```bash
 # Edit token.env file
 cp token.env.example token.env
@@ -49,6 +53,7 @@ nano token.env
 ```
 
 3. **Systemd service setup:**
+
 ```bash
 # Edit service file
 sudo cp systemd_service.service /etc/systemd/system/ai-twitterpersona.service
@@ -67,6 +72,7 @@ sudo systemctl status ai-twitterpersona
 ```
 
 4. **Nginx reverse proxy:**
+
 ```bash
 # Nginx configuration
 sudo nano /etc/nginx/sites-available/ai-twitterpersona
@@ -99,6 +105,7 @@ sudo systemctl reload nginx
 ### 2. Docker Deployment
 
 #### Simple Docker
+
 ```bash
 # Build image
 docker build -t ai-twitterpersona-dashboard .
@@ -115,6 +122,7 @@ docker run -d \
 ```
 
 #### Docker Compose (Recommended)
+
 ```bash
 # Setup environment
 cp token.env.example token.env
@@ -130,6 +138,7 @@ docker-compose logs -f ai-twitterpersona
 ### 3. Cloud Deployment
 
 #### Heroku
+
 ```bash
 # Heroku CLI must be installed
 heroku create ai-twitterpersona-dashboard
@@ -147,6 +156,7 @@ git push heroku main
 ```
 
 #### AWS/DigitalOcean/VPS
+
 - Use Docker Compose file
 - Use Kubernetes for load balancing and auto-scaling
 - Use managed PostgreSQL for database
@@ -154,6 +164,7 @@ git push heroku main
 ## 🔒 Security Configuration
 
 ### 1. SSL/TLS (HTTPS)
+
 ```bash
 # SSL certificate with Let's Encrypt
 sudo apt install certbot python3-certbot-nginx
@@ -164,6 +175,7 @@ sudo systemctl enable certbot.timer
 ```
 
 ### 2. Security Headers
+
 ```nginx
 # Add to Nginx
 add_header X-Frame-Options DENY;
@@ -173,6 +185,7 @@ add_header Strict-Transport-Security "max-age=31536000; includeSubDomains";
 ```
 
 ### 3. Firewall
+
 ```bash
 # Port management with UFW
 sudo ufw allow 22    # SSH
@@ -184,6 +197,7 @@ sudo ufw enable
 ## 📊 Monitoring and Logging
 
 ### 1. Log Management
+
 ```bash
 # Log rotation
 sudo nano /etc/logrotate.d/ai-twitterpersona
@@ -199,6 +213,7 @@ sudo nano /etc/logrotate.d/ai-twitterpersona
 ```
 
 ### 2. Health Monitoring
+
 ```bash
 # Health check with cron job
 crontab -e
@@ -208,6 +223,7 @@ crontab -e
 ```
 
 ### 3. Performance Monitoring
+
 - Track metrics with **Grafana + Prometheus**
 - Use **Uptime monitoring** services (UptimeRobot, Pingdom)
 - **Log aggregation** (ELK Stack, Loki)
@@ -215,6 +231,7 @@ crontab -e
 ## 🔧 Maintenance
 
 ### 1. Updates
+
 ```bash
 # Stop service
 sudo systemctl stop ai-twitterpersona
@@ -232,12 +249,14 @@ sudo systemctl start ai-twitterpersona
 ```
 
 ### 2. Backup
+
 ```bash
 # Database and configuration backup
 tar -czf backup-$(date +%Y%m%d).tar.gz token.env twitter.db logs/
 ```
 
 ### 3. Troubleshooting
+
 ```bash
 # Service status
 sudo systemctl status ai-twitterpersona
@@ -253,15 +272,18 @@ tail -f logs/gunicorn_error.log
 ## ⚡ Performance Optimization
 
 ### 1. Database
+
 - Use PostgreSQL instead of SQLite (for multi-user)
 - Add database indexes
 - Enable connection pooling
 
 ### 2. Caching
+
 - Redis for session and cache management
 - Use CDN (CloudFlare, AWS CloudFront)
 
 ### 3. Load Balancing
+
 - Load balancing with Nginx
 - Multi-instance deployment
 - Auto-scaling configuration
