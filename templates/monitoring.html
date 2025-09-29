@@ -234,13 +234,17 @@
     document.addEventListener('DOMContentLoaded', function() {
         startRealTimeUpdates();
         startUptimeCounter();
-        simulateConsoleOutput();
+        // simulateConsoleOutput(); // Removed - will use real WebSocket data
         updateActivityLog(); // Load activities on page load
-        
+
         // Initial success rate coloring
         const initialRate = document.getElementById('success-rate').textContent;
         const rate = parseFloat(initialRate.replace('%', ''));
         document.getElementById('success-rate').className = getSuccessRateColorClass(rate);
+
+        // Clear mock data from console
+        document.getElementById('console-output').innerHTML = '';
+        addConsoleLog('INFO', 'Gerçek zamanlı izleme başlatıldı');
     });
     
     // Real-time updates
