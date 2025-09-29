@@ -119,19 +119,84 @@ endblock %} {% block content %}
 </div>
 {% endblock %} {% block scripts %}
 <script>
+  // Socket is already initialized in app.js, no need to re-initialize
+
+  // Listen for additional bot status updates if needed
+  if (typeof socket !== 'undefined') {
+    socket.on('dashboard_update', function(data) {
+      console.log('Dashboard update:', data);
+      updateBotUI(data.running);
+    });
+  }
+
   // Real-time updates
-  setInterval(updateStatus, 5000); // Update every 5 seconds
+  setInterval(updateStatus, 10000); // Update every 10 seconds
 
   function updateStatus() {
     fetch("/api/status")
       .then((response) => response.json())
       .then((data) => {
-        // Update page with real-time data
-        location.reload(); // Simple refresh for now
+        // Update UI based on status
+        updateBotUI(data.running);
+      })
+      .catch((error) => {
+        console.error("Status update error:", error);
       });
   }
 
+  function updateBotUI(isRunning) {
+    // Update status badge
+    const statusBadge = document.querySelector('.card-body .badge');
+    if (statusBadge) {
+      if (isRunning) {
+        statusBadge.className = 'badge bg-success fs-6';
+        statusBadge.innerHTML = '<i class="fas fa-play"></i> Çalışıyor';
+      } else {
+        statusBadge.className = 'badge bg-danger fs-6';
+        statusBadge.innerHTML = '<i class="fas fa-stop"></i> Durduruldu';
+      }
+    }
+
+    // Update control button
+    const controlButtons = document.querySelectorAll('button[onclick*="controlBot"]');
+    controlButtons.forEach(button => {
+      if (isRunning) {
+        button.className = 'btn btn-outline-danger';
+        button.innerHTML = '<i class="fas fa-stop"></i> Durdur';
+        button.onclick = () => controlBot('stop');
+      } else {
+        button.className = 'btn btn-outline-success';
+        button.innerHTML = '<i class="fas fa-play"></i> Başlat';
+        button.onclick = () => controlBot('start');
+      }
+    });
+
+    // Update bot start time visibility
+    const startTimeElement = document.querySelector('.text-muted');
+    if (startTimeElement && startTimeElement.textContent.includes('Başlatılma:')) {
+      if (!isRunning) {
+        // Hide start time and separator when bot is stopped
+        startTimeElement.style.display = 'none';
+        const separator = startTimeElement.previousElementSibling;
+        if (separator && separator.tagName === 'HR') {
+          separator.style.display = 'none';
+        }
+      } else {
+        // Show start time when bot is running
+        startTimeElement.style.display = 'block';
+        const separator = startTimeElement.previousElementSibling;
+        if (separator && separator.tagName === 'HR') {
+          separator.style.display = 'block';
+        }
+      }
+    }
+  }
+
   function controlBot(action) {
+    // Disable button to prevent duplicate clicks
+    const buttons = document.querySelectorAll('button[onclick*="controlBot"]');
+    buttons.forEach(btn => btn.disabled = true);
+
     fetch("/api/control", {
       method: "POST",
       headers: {
@@ -145,11 +210,38 @@ endblock %} {% block content %}
       .then((response) => response.json())
       .then((data) => {
         if (data.success) {
-          alert(data.message);
-          location.reload();
+          // Show success message
+          console.log(data.message);
+
+          // Update UI immediately (WebSocket will also update)
+          updateBotUI(action === 'start');
+
+          // Show notification instead of alert
+          const notification = document.createElement('div');
+          notification.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
+          notification.style.zIndex = '9999';
+          notification.innerHTML = `
+            ${data.message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          `;
+          document.body.appendChild(notification);
+
+          // Auto-dismiss after 3 seconds
+          setTimeout(() => {
+            notification.remove();
+          }, 3000);
         } else {
+          // Show error
           alert("Hata: " + data.message);
         }
+      })
+      .catch((error) => {
+        console.error("Bot control error:", error);
+        alert("Bot kontrolünde hata oluştu");
+      })
+      .finally(() => {
+        // Re-enable buttons
+        buttons.forEach(btn => btn.disabled = false);
       });
   }
 
