@@ -131,12 +131,15 @@ function updateBotStatus(isRunning) {
 }
 
 function updateStats(stats) {
+    // Check if stats exists
+    if (!stats) return;
+
     // Update various stats on the dashboard
     if (stats.daily_tweets !== undefined) {
         const dailyElement = document.querySelector('.daily-tweets');
         if (dailyElement) dailyElement.textContent = stats.daily_tweets;
     }
-    
+
     if (stats.total_tweets !== undefined) {
         const totalElement = document.querySelector('.total-tweets');
         if (totalElement) totalElement.textContent = stats.total_tweets;

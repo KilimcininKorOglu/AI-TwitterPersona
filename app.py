@@ -555,12 +555,18 @@ def api_control():
             try:
                 # Clear any previous stop signal
                 bot_stop_event.clear()
-                
+
+                print(f"[INFO] Starting bot thread...")
                 bot_thread = threading.Thread(target=run_bot_thread)
                 bot_thread.daemon = True
                 bot_thread.start()
                 bot_running = True
                 bot_stats["bot_start_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                print(f"[SUCCESS] Bot started successfully, bot_running={bot_running}")
+
+                # Broadcast status update via SocketIO
+                socketio.emit('bot_status', {'running': True, 'message': 'Bot başlatıldı'})
+
                 return jsonify({"success": True, "message": "Bot başlatıldı"})
             except Exception as e:
                 print(f"[!] Error starting bot thread: {e}")
@@ -568,15 +574,24 @@ def api_control():
             
         elif action == 'stop' and bot_running:
             try:
-                with bot_lock:
-                    bot_running = False
-                    bot_stop_event.set()  # Signal thread to stop
-                
+                print(f"[INFO] Stopping bot thread...")
+                bot_running = False
+                bot_stop_event.set()  # Signal thread to stop
+
                 # Wait for thread to finish gracefully
                 if bot_thread and bot_thread.is_alive():
                     bot_thread.join(timeout=3.0)
-                
+
                 bot_stop_event.clear()  # Reset for future use
+
+                # Clear bot start time when stopped
+                bot_stats["bot_start_time"] = None
+
+                print(f"[SUCCESS] Bot stopped successfully, bot_running={bot_running}")
+
+                # Broadcast status update via SocketIO
+                socketio.emit('bot_status', {'running': False, 'message': 'Bot durduruldu'})
+
                 return jsonify({"success": True, "message": "Bot durduruldu"})
             except Exception as e:
                 return jsonify({"success": False, "message": f"Bot durdurma hatası: {str(e)}"})
@@ -1041,9 +1056,20 @@ def get_current_config():
     current_url = get_config("TRENDS_URL", "https://xtrends.iamrohit.in/turkey")
     trend_country = url_to_country.get(current_url, 'turkey')
     
+    # Parse SLEEP_HOURS safely
+    sleep_hours_raw = get_config("SLEEP_HOURS", "1,3,9,10")
+    # Remove brackets if present
+    if sleep_hours_raw.startswith('['):
+        sleep_hours_raw = sleep_hours_raw.strip('[]')
+    # Parse the hours
+    try:
+        sleep_hours = [int(x.strip()) for x in sleep_hours_raw.split(",")]
+    except ValueError:
+        sleep_hours = [1, 3, 9, 10]  # Default values
+
     return {
         "trends_limit": get_int_config("TRENDS_LIMIT", 3),
-        "sleep_hours": [int(x) for x in get_config("SLEEP_HOURS", "1,3,9,10").split(",")],
+        "sleep_hours": sleep_hours,
         "cycle_duration": get_int_config("CYCLE_DURATION_MINUTES", 60),
         "night_mode_start": get_int_config("NIGHT_MODE_START", 1),
         "night_mode_end": get_int_config("NIGHT_MODE_END", 6),
@@ -1112,23 +1138,36 @@ def run_bot_thread():
         with bot_lock:
             bot_running = False
         return
-        
+
     try:
-        # Modified version of main.run_bot() that respects bot_stop_event
+        # Use main.run_bot() but with modified loop to check bot_stop_event
+        import time
+        from config import get_int_config
+
+        CYCLE_DURATION_MINUTES = get_int_config("CYCLE_DURATION_MINUTES", 30)
+
         while not bot_stop_event.is_set():
-            # Actually run the bot logic - post tweets
-            # Get trending topics and generate tweet
-            trending_topics = main.get_trending_topics()
-            if trending_topics:
-                import reply
-                tweet = reply.generate_reply(trending_topics[0])
-                if tweet:
-                    main.scheduled_tweet(tweet)  # Actually post tweets
-            
-            # Use event.wait() instead of time.sleep() for interruptible waiting
-            if bot_stop_event.wait(timeout=main.CYCLE_DURATION_MINUTES * 60):
-                break  # Event was set during wait, exit loop
-                
+            try:
+                # Run one iteration of the bot logic
+                if main.isTrendingTime():
+                    main.trending_tweets()
+                else:
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Sleep hour - no tweets")
+
+                # Update stats
+                bot_stats["last_check"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+                # Use event.wait() for interruptible sleep
+                if bot_stop_event.wait(timeout=CYCLE_DURATION_MINUTES * 60):
+                    break  # Event was set during wait, exit loop
+
+            except Exception as cycle_error:
+                print(f"Bot cycle error: {cycle_error}")
+                broadcast_console_log('ERROR', f'Bot cycle error: {str(cycle_error)}')
+                # Continue running even if one cycle fails
+                if bot_stop_event.wait(timeout=60):  # Wait 1 minute before retry
+                    break
+
     except Exception as e:
         print(f"Bot thread error: {e}")
         broadcast_console_log('ERROR', f'Bot thread error: {str(e)}')
