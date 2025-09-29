@@ -135,6 +135,13 @@ endblock %} {% block content %}
   </div>
 </div>
 {% endblock %} {% block scripts %}
+<style>
+  .trend-badge:hover {
+    background-color: #5a6268 !important;
+    transform: scale(1.05);
+    transition: all 0.2s ease;
+  }
+</style>
 <script>
   // Character count update
   function updateCharCount() {
@@ -298,10 +305,13 @@ endblock %} {% block content %}
         const container = document.getElementById("trending-topics");
         if (data.trends && data.trends.length > 0) {
           container.innerHTML = data.trends
-            .map(
-              (trend) =>
-                `<small class="badge bg-secondary text-light me-1 mb-1">${trend}</small>`
-            )
+            .map((trend) => {
+              // Extract just the hashtag part (including Turkish characters)
+              const hashtagMatch = trend.match(/#[a-zA-Z0-9ğüşıöçĞÜŞİÖÇ]+/);
+              const hashtag = hashtagMatch ? hashtagMatch[0] : trend;
+
+              return `<small class="badge bg-secondary text-light me-1 mb-1 trend-badge" style="cursor: pointer;" onclick="addHashtagToTweet('${hashtag}')" title="Tweet'e eklemek için tıklayın">${trend}</small>`;
+            })
             .join("");
         } else {
           container.innerHTML =
@@ -312,6 +322,28 @@ endblock %} {% block content %}
         document.getElementById("trending-topics").innerHTML =
           '<small class="text-muted">Trendler yüklenemedi</small>';
       });
+  }
+
+  // Add hashtag to tweet text
+  function addHashtagToTweet(hashtag) {
+    const tweetTextArea = document.getElementById("tweet-text");
+    const currentText = tweetTextArea.value.trim();
+
+    // Add space if there's existing content
+    if (currentText) {
+      tweetTextArea.value = currentText + " " + hashtag;
+    } else {
+      tweetTextArea.value = hashtag;
+    }
+
+    // Update character count
+    updateCharCount();
+
+    // Focus on the text area
+    tweetTextArea.focus();
+
+    // Move cursor to the end
+    tweetTextArea.setSelectionRange(tweetTextArea.value.length, tweetTextArea.value.length);
   }
 
   // Load persona settings for preview
