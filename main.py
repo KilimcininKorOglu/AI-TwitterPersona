@@ -297,10 +297,15 @@ def run_bot():
         # Generate AI-powered tweet using the prepared prompt
         print("Generating Reply...Topic: ", prompt)
         tweet = reply.generate_reply(prompt)
-        
-        if tweet:
+
+        # Check if tweet is None (political topic)
+        if tweet is None:
+            print("[!] Political topic detected, trying another trending topic...")
+            # Skip this topic and try to get another one
+            continue
+        elif tweet:
             print(f"Tweet: {tweet}")
-            
+
             # Auto-approve tweet posting (manual approval option commented out)
             option = "y"  # Automatic approval for autonomous operation
             

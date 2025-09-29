@@ -1270,7 +1270,15 @@ def run_bot_thread():
                     import reply
                     tweet = reply.generate_reply(prompt)
 
-                if tweet:
+                # Check if tweet is None (political topic)
+                if tweet is None:
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Political topic detected, skipping...")
+                    broadcast_console_log('WARNING', 'Political topic detected, skipping to avoid controversy')
+                    # Try again with shorter wait
+                    if bot_stop_event.wait(timeout=10):
+                        break
+                    continue
+                elif tweet:
                     print(f"[{datetime.now().strftime('%H:%M:%S')}] Tweet generated: {tweet}")
                     broadcast_console_log('SUCCESS', f'Tweet generated: {tweet}')
 
