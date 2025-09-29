@@ -652,17 +652,16 @@ def api_enhance_tweet():
 
         # Create enhancement prompt using persona from database
         enhancement_prompt = f"""
-{persona_prompt}
+            {persona_prompt}
 
-Konu: {original_text}
+            Konu: {original_text}
 
-ÖNEMLİ KURALLAR:
-1. Oluşturacağın tweet'in karakter sayısı yukarıda yazıyor. asla aşmayacaksın!
-2. Tweet'i kesik bırakma, tam bir cümle olsun
-3. Karakter sayısını kendin hesapla ve limit asla geçme!
-4. Emoji ve hashtag'ler de karakter sayısına dahil
+            ÖNEMLİ KURALLAR:
+            1. Oluşturacağın tweet'in karakter sayısı yukarıda yazıyor. asla aşmayacaksın!
+            2. Tweet'i kesik bırakma, tam bir cümle olsun
+            3. Emoji ve hashtag'ler de karakter sayısına dahil
 
-Sadece tweet metnini yaz, başka hiçbir açıklama ekleme."""
+            Sadece tweet metnini yaz, başka hiçbir açıklama ekleme."""
 
         # Use Gemini AI to enhance the tweet
         import google.generativeai as genai
