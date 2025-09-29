@@ -249,7 +249,7 @@ def trending_tweets():
 def run_bot():
     """
     Main bot execution loop - handles the complete tweet generation and posting cycle.
-    
+
     This function runs indefinitely and performs the following steps:
     1. Check if it's appropriate time to post trending topics
     2. Fetch trending topics or use general prompt
@@ -257,11 +257,16 @@ def run_bot():
     4. Post tweet to Twitter and log to database
     5. Sleep for configured duration before next cycle
     """
+    print(f"[+] Bot starting at {dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"[+] Configuration: CYCLE_DURATION={CYCLE_DURATION_MINUTES} min, SLEEP_HOURS={SLEEP_HOURS}")
+
     # Initialize bot modules
     if not initialize_bot_modules():
         print("[!] Error: Could not initialize bot modules")
         logging.info("Please check your API configuration in token.env")
         return
+
+    print("[+] Bot initialization complete. Entering main loop...")
     
     while True:
         prompt = ""  # Initialize prompt for AI tweet generation
