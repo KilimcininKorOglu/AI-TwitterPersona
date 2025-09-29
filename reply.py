@@ -131,12 +131,13 @@ def detect_topic_type(user_input):
     """
     Classify the input topic into one of three persona categories: tech, casual, or sad.
     Uses caching to avoid re-classifying the same topics and improve performance.
+    Returns 'political' for political content to skip.
 
     Args:
         user_input (str): The topic/prompt to be classified
 
     Returns:
-        str: One of 'tech', 'casual', or 'sad' - defaults to 'casual' on any error
+        str: One of 'tech', 'casual', 'sad', or 'political' - defaults to 'casual' on any error
     """
     # Extract hashtag from complex prompt if present
     import re
@@ -194,19 +195,22 @@ def detect_topic_type(user_input):
     try:
         # Create classification prompt for Gemini AI
         prompt = f"""Aşağıdaki hashtag veya konuyu analiz et ve şu kategorilerden birine sınıflandır:
+- political: SİYASET, parti, siyasetçi, seçim, hükümet, muhalefet, meclis, vekil, bakan, cumhurbaşkanı ile ilgili konular
 - tech: Teknoloji, bilim, yazılım, startup, kripto, AI konuları
 - sad: Üzücü haberler, ölüm, hastalık, felaket, kayıplar
-- casual: Diğer tüm konular (günlük hayat, spor, siyaset, magazin, eğlence, sosyal medya trendleri)
+- casual: Diğer tüm konular (günlük hayat, spor, magazin, eğlence, sosyal medya trendleri)
+
+ÖNEMLİ: Eğer konu siyasi ise MUTLAKA "political" döndür.
 
 Konu: "{topic_to_classify}"
-Sadece kategori adını döndür (tech/sad/casual)."""
+Sadece kategori adını döndür (political/tech/sad/casual)."""
         
         # Get classification from Gemini AI
         resp = model.generate_content(prompt)
         category = resp.text.strip().lower()
         
         # Validate response and default to 'casual' if invalid
-        if category not in ["tech", "casual", "sad"]:
+        if category not in ["tech", "casual", "sad", "political"]:
             category = "casual"
             
     except google.api_core.exceptions.InvalidArgument as e:
@@ -269,21 +273,27 @@ Sadece kategori adını döndür (tech/sad/casual)."""
 def generate_reply(user_input):
     """
     Generate a tweet response using the appropriate persona based on topic classification.
-    
+    Skips political topics and returns None to indicate skipping.
+
     Args:
         user_input (str): The topic or trending subject to generate a tweet about
-        
+
     Returns:
-        str: Generated tweet text (max 285 characters) or empty string on error
+        str: Generated tweet text (max 285 characters), None for political topics, or empty string on error
     """
     # Initialize Gemini if not already done
     if not initialize_gemini():
         print("[!] Cannot generate reply: Gemini API not initialized")
         return ""
-    
+
     # Classify the topic to determine appropriate persona
     topic = detect_topic_type(user_input)
-    
+
+    # Skip political topics
+    if topic == "political":
+        print(f"[!] Political topic detected, skipping: {user_input[:50]}...")
+        return None  # Return None to indicate political topic should be skipped
+
     # Get the corresponding persona prompt from database
     active_prompts = database.get_active_prompts_dict()
     
