@@ -37,9 +37,10 @@ class ConfigManager:
     def _load_config(self):
         """Load environment variables from token.env"""
         try:
-            load_dotenv("token.env")
+            # Use override=True to force reload of changed values
+            load_dotenv("token.env", override=True)
             self._last_reload = time.time()
-            print("[CONFIG] Environment variables loaded successfully")
+            print("[CONFIG] Environment variables reloaded successfully")
         except Exception as e:
             print(f"[CONFIG ERROR] Failed to load environment: {e}")
     

@@ -1721,7 +1721,8 @@ def update_token_env(new_config):
                     if isinstance(validated_config['sleep_hours'], str):
                         value = validated_config['sleep_hours']
                     else:
-                        value = ','.join(map(str, validated_config['sleep_hours']))
+                        # Format as [1, 2, 3] with brackets and spaces to match token.env format
+                        value = '[' + ', '.join(map(str, validated_config['sleep_hours'])) + ']'
                     # SECURITY: Sanitize value
                     sanitized_value = value.replace('\n', '').replace('\r', '').replace('\0', '')
                     updated_lines[i] = f"SLEEP_HOURS={sanitized_value}\n"
