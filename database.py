@@ -207,6 +207,31 @@ Maksimum {max_tweet_length} karakter. Tek tweet.""",
 
             print("[+] Default AI persona prompts inserted into database")
 
+        # Create indexes for performance optimization
+        print("[+] Creating database indexes for performance...")
+
+        # Tweets table indexes
+        cursor.execute(f"""CREATE INDEX IF NOT EXISTS idx_{tableName}_date
+                          ON {tableName}(tweet_date)""")
+        cursor.execute(f"""CREATE INDEX IF NOT EXISTS idx_{tableName}_sent
+                          ON {tableName}(sent)""")
+        cursor.execute(f"""CREATE INDEX IF NOT EXISTS idx_{tableName}_type
+                          ON {tableName}(tweet_type)""")
+        cursor.execute(f"""CREATE INDEX IF NOT EXISTS idx_{tableName}_created
+                          ON {tableName}(created_at DESC)""")
+
+        # Prompts table indexes
+        cursor.execute("""CREATE INDEX IF NOT EXISTS idx_prompts_type
+                          ON prompts(prompt_type)""")
+        cursor.execute("""CREATE INDEX IF NOT EXISTS idx_prompts_active
+                          ON prompts(is_active)""")
+
+        # Persona settings table indexes
+        cursor.execute("""CREATE INDEX IF NOT EXISTS idx_persona_key
+                          ON persona_settings(setting_key)""")
+
+        print("[+] Database indexes created successfully")
+
         db.commit()  # Save all changes
         print(f"[+] Prompts table created and initialized")
 
