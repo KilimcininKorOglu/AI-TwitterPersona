@@ -48,9 +48,9 @@ export default function AnalyticsPage() {
   const fetchAnalytics = async () => {
     try {
       const [successRes, personaRes, hourlyRes] = await Promise.all([
-        fetch("http://127.0.0.1:5000/api/analytics/success_rate"),
-        fetch("http://127.0.0.1:5000/api/analytics/personas"),
-        fetch("http://127.0.0.1:5000/api/analytics/hourly_activity")
+        fetch("/api/analytics/success_rate"),
+        fetch("/api/analytics/personas"),
+        fetch("/api/analytics/hourly_activity")
       ]);
 
       const successJson = await successRes.json();
