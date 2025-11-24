@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react";
 import {
   Activity,
+  BarChart3,
   Bot,
   Clock,
   MessageSquare,
   Play,
   Power,
   RefreshCw,
+  Settings,
   SquareTerminal,
   TrendingUp,
   Twitter,
@@ -98,6 +100,27 @@ export default function Dashboard() {
           </div>
         </div>
         <div className="flex items-center gap-4">
+          <a
+            href="/tweets"
+            className="px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-lg transition-colors text-sm font-medium flex items-center gap-2 cursor-pointer"
+          >
+            <Clock className="w-4 h-4" />
+            Tweet Geçmişi
+          </a>
+          <a
+            href="/analytics"
+            className="px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-lg transition-colors text-sm font-medium flex items-center gap-2 cursor-pointer"
+          >
+            <BarChart3 className="w-4 h-4" />
+            İstatistikler
+          </a>
+          <a
+            href="/settings"
+            className="px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-lg transition-colors text-sm font-medium flex items-center gap-2 cursor-pointer"
+          >
+            <Settings className="w-4 h-4" />
+            Ayarlar
+          </a>
           <div
             className={cn(
               "flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-medium transition-colors",
