@@ -303,33 +303,6 @@ def save_tweets(tweet, tweet_type, status):
             except:
                 pass
 
-def get_all_prompts():
-    """
-    Retrieve all AI persona prompts from the database.
-
-    Returns:
-        list: List of tuples containing (id, prompt_type, prompt_text, description, is_active)
-              Returns empty list if no prompts found or error occurs
-    """
-    try:
-        db = get_db_connection()
-        if db is None:
-            return []
-
-        cursor = db.cursor()
-        cursor.execute("""SELECT id, prompt_type, prompt_text, description, is_active, updated_at
-                         FROM prompts ORDER BY prompt_type""")
-        prompts = cursor.fetchall()
-        return prompts
-
-    except Exception as e:
-        print(f"[-] Error retrieving prompts: {e}")
-        return []
-    finally:
-        if 'cursor' in locals():
-            cursor.close()
-        if 'db' in locals() and db:
-            db.close()
 
 def get_prompt_by_type(prompt_type):
     """
@@ -404,36 +377,6 @@ def update_prompt(prompt_type, prompt_text, description=None):
         if 'db' in locals() and db:
             db.close()
 
-def get_prompts():
-    """
-    Get all active prompts from the database.
-
-    Returns:
-        dict: Dictionary of prompt_type -> prompt_text for active prompts
-    """
-    try:
-        db = get_db_connection()
-        if db is None:
-            return {}
-
-        cursor = db.cursor()
-        cursor.execute("""SELECT prompt_type, prompt_text
-                         FROM prompts
-                         WHERE is_active = 1""")
-
-        rows = cursor.fetchall()
-        prompts = {row[0]: row[1] for row in rows}
-
-        return prompts
-
-    except Exception as e:
-        print(f"[-] Error fetching prompts: {e}")
-        return {}
-    finally:
-        if 'cursor' in locals():
-            cursor.close()
-        if 'db' in locals() and db:
-            db.close()
 
 def toggle_prompt_status(prompt_type):
     """

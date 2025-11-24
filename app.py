@@ -816,8 +816,8 @@ def api_enhance_tweet():
         return jsonify({"success": False, "message": "Tweet metni gerekli"}), 400
 
     try:
-        # Get persona prompt from database
-        prompts = database.get_prompts()
+        # Get persona prompt from database (formatted with persona settings)
+        prompts = database.get_active_prompts_dict()
         persona_prompt = prompts.get(persona, prompts.get('casual', ''))
 
         # Create enhancement prompt using persona from database
@@ -2022,7 +2022,7 @@ def api_analytics_trending_topics():
     try:
         # Call periodic memory cleanup
         analytics_memory_cleanup()
-        conn = sqlite3.connect(database.dbName)
+        conn = database.get_db_connection()
         cursor = conn.cursor()
 
         # Get most common words/topics from tweet content
@@ -2108,7 +2108,7 @@ def api_analytics_trending_topics():
 def api_export_database():
     """Export complete database to JSON"""
     try:
-        conn = sqlite3.connect(database.dbName)
+        conn = database.get_db_connection()
         cursor = conn.cursor()
 
         # Export tweets table
@@ -2166,7 +2166,7 @@ def api_import_database():
                 'message': 'Geçersiz import verisi'
             }), 400
 
-        conn = sqlite3.connect(database.dbName)
+        conn = database.get_db_connection()
         cursor = conn.cursor()
 
         # Get existing tweet IDs to avoid duplicates
@@ -2408,7 +2408,7 @@ def get_realtime_stats():
         stats = {}
 
         # Get success rate from database
-        conn = sqlite3.connect(database.dbName)
+        conn = database.get_db_connection()
         cursor = conn.cursor()
 
         # Calculate success rate from last 100 tweets
@@ -2452,7 +2452,7 @@ def get_realtime_stats():
             cycle_minutes = get_int_config("CYCLE_DURATION_MINUTES", 60)
 
             # Find last tweet time
-            conn = sqlite3.connect(database.dbName)
+            conn = database.get_db_connection()
             cursor = conn.cursor()
             cursor.execute("SELECT created_at FROM tweets WHERE sent = 1 ORDER BY created_at DESC LIMIT 1")
             last_tweet = cursor.fetchone()
@@ -2496,7 +2496,7 @@ def get_realtime_stats():
 def get_recent_activity():
     """Get recent bot activity logs"""
     try:
-        conn = sqlite3.connect(database.dbName)
+        conn = database.get_db_connection()
         cursor = conn.cursor()
 
         # Get last 5 tweets with their details
@@ -2586,7 +2586,7 @@ def get_database_stats():
             size_str = "0 KB"
 
         # Get total tweet count
-        conn = sqlite3.connect(database.dbName)
+        conn = database.get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM tweets")
         total_tweets = cursor.fetchone()[0]
