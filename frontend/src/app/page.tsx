@@ -123,7 +123,7 @@ export default function Dashboard() {
         <Card>
           <div className="flex items-center justify-between mb-4">
             <span className="text-muted-foreground text-sm font-medium">Günlük Tweetler</span>
-            <Twitter className="w-4 h-4 text-blue-400" />
+            <XIcon className="w-4 h-4 text-blue-400" />
           </div>
           <div className="text-3xl font-bold">
             {status?.stats?.daily_tweets || 0}
@@ -180,7 +180,7 @@ export default function Dashboard() {
                 <button
                   onClick={() => handleControl("start")}
                   disabled={refreshing}
-                  className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-600/50 text-white py-2 rounded-lg font-medium transition-all active:scale-95 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-600/50 text-white py-2 rounded-lg font-medium transition-all active:scale-95 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
                 >
                   {refreshing ? (
                     <>
@@ -197,7 +197,7 @@ export default function Dashboard() {
                 <button
                   onClick={() => handleControl("stop")}
                   disabled={refreshing}
-                  className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-red-600/50 text-white py-2 rounded-lg font-medium transition-all active:scale-95 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-red-600/50 text-white py-2 rounded-lg font-medium transition-all active:scale-95 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
                 >
                   {refreshing ? (
                     <>

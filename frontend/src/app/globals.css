@@ -1,3 +1,21 @@
+@font-face {
+  font-family: GalanoGrotesqueBold;
+  src: url(/fonts/GalanoGrotesqueBold.otf) format("opentype");
+  font-style: normal;
+}
+
+@font-face {
+  font-family: GalanoGrotesqueMedium;
+  src: url(/fonts/GalanoGrotesqueMedium.otf) format("opentype");
+  font-style: normal;
+}
+
+@font-face {
+  font-family: GalanoGrotesqueSemiBold;
+  src: url(/fonts/GalanoGrotesqueSemiBold.otf) format("opentype");
+  font-style: normal;
+}
+
 @import "tailwindcss";
 
 @theme {
@@ -28,6 +46,11 @@
   --color-border: hsl(217.2 32.6% 17.5%);
   --color-input: hsl(217.2 32.6% 17.5%);
   --color-ring: hsl(212.7 26.8% 83.9%);
+
+  --font-galano-bold: GalanoGrotesqueBold, ui-serif;
+  --font-galano-medium: GalanoGrotesqueMedium, ui-serif;
+  --font-galano-semibold: GalanoGrotesqueSemiBold, ui-serif;
+  --font-sans: GalanoGrotesqueMedium, system-ui, -apple-system, sans-serif;
 }
 
 @layer base {
