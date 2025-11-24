@@ -5,6 +5,7 @@ from flask_wtf import FlaskForm, CSRFProtect
 from flask_wtf.csrf import CSRFError
 from wtforms import StringField, PasswordField, SubmitField
 from wtforms.validators import DataRequired
+from flask_cors import CORS # Import CORS
 import bcrypt
 import threading
 import time
@@ -47,7 +48,7 @@ def sanitize_for_logging(data):
     """
     if isinstance(data, dict):
         sensitive_keys = [
-            'api_key', 'api_secret', 'access_token', 'access_token_secret', 
+            'api_key', 'api_secret', 'access_token', 'access_token_secret',
             'bearer_token', 'gemini_api_key', 'password', 'secret', 'token'
         ]
         sanitized = {}
@@ -86,7 +87,7 @@ def secure_log(level, message, data=None):
     if data is not None:
         sanitized_data = sanitize_for_logging(data)
         message = f"{message}: {sanitized_data}"
-    
+
     if level.upper() == 'DEBUG':
         secure_logger.debug(message)
     elif level.upper() == 'INFO':
@@ -108,7 +109,7 @@ def analytics_memory_cleanup():
     """Periodic memory cleanup for analytics functions"""
     global _analytics_cleanup_counter
     _analytics_cleanup_counter += 1
-    
+
     if _analytics_cleanup_counter >= _analytics_cleanup_interval:
         gc.collect()  # Force garbage collection
         _analytics_cleanup_counter = 0
@@ -121,51 +122,51 @@ def validate_secret_key_strength(key):
     """
     issues = []
     score = 0
-    
+
     # Length check
     if len(key) < 32:
         issues.append("Secret key should be at least 32 characters long")
     else:
         score += 2
-    
+
     if len(key) >= 64:
         score += 1
-        
+
     # Character variety check
     has_upper = any(c.isupper() for c in key)
     has_lower = any(c.islower() for c in key)
     has_digit = any(c.isdigit() for c in key)
     has_special = any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in key)
-    
+
     variety_count = sum([has_upper, has_lower, has_digit, has_special])
-    
+
     if variety_count < 2:
         issues.append("Secret key should contain different character types (upper, lower, digits, special)")
     else:
         score += variety_count
-    
+
     # Common/weak patterns check
     weak_patterns = [
         "secret", "password", "key", "twitter", "bot", "flask",
         "123456", "abcdef", "qwerty", "admin", "test", "default"
     ]
-    
+
     key_lower = key.lower()
     for pattern in weak_patterns:
         if pattern in key_lower:
             issues.append(f"Secret key contains weak pattern: '{pattern}'")
             score -= 1
-    
+
     # Entropy check (simplified)
     unique_chars = len(set(key))
     if unique_chars < len(key) * 0.5:  # Less than 50% unique characters
         issues.append("Secret key has low entropy (too many repeated characters)")
     else:
         score += 1
-    
+
     # Classification
     is_strong = len(issues) == 0 and score >= 5
-    
+
     return is_strong, issues, max(0, score)
 
 def generate_secure_secret_key():
@@ -173,64 +174,64 @@ def generate_secure_secret_key():
     # Generate 64 random bytes and convert to URL-safe base64
     random_bytes = secrets.token_bytes(64)
     secure_key = secrets.token_urlsafe(64)
-    
+
     # Add timestamp hash for additional uniqueness
     timestamp = str(time.time()).encode()
     timestamp_hash = hashlib.sha256(timestamp).hexdigest()[:16]
-    
+
     # Combine for final key
     final_key = f"{secure_key}-{timestamp_hash}"
-    
+
     return final_key
 
 def setup_secure_flask_secret():
     """Setup Flask secret key with security validation"""
     # Get configured secret key
     configured_key = get_config("FLASK_SECRET_KEY", None)
-    
+
     # Default weak keys that should never be used
     weak_default_keys = [
-        "twitter-bot-secret-key", "default-secret-key", "secret-key", 
+        "twitter-bot-secret-key", "default-secret-key", "secret-key",
         "flask-secret", "your-secret-key", "change-this-key",
         "super-secret-key", "my-secret-key", "development-key"
     ]
-    
+
     # Check if we have a configured key
     if not configured_key or configured_key in weak_default_keys:
         # Generate new secure key
         new_key = generate_secure_secret_key()
-        
+
         # Log security warning
         secure_log('warning', "No secure Flask secret key found - generated new one")
         secure_log('warning', "IMPORTANT: Save this key to FLASK_SECRET_KEY in token.env for production use")
         secure_log('info', f"Generated key length: {len(new_key)} characters")
-        
+
         return new_key
-    
+
     # Validate existing key strength
     is_strong, issues, score = validate_secret_key_strength(configured_key)
-    
+
     if not is_strong:
         secure_log('warning', f"Flask secret key has security issues (score: {score}/7)")
         for issue in issues:
             secure_log('warning', f"  - {issue}")
-        
+
         if score < 3:  # Very weak key
             secure_log('error', "Secret key is too weak - generating new secure key")
-            new_key = generate_secure_secret_key() 
+            new_key = generate_secure_secret_key()
             secure_log('warning', "IMPORTANT: Update FLASK_SECRET_KEY in token.env with secure key")
             return new_key
         else:
             secure_log('warning', "Using existing key but consider improving it")
     else:
         secure_log('info', f"Flask secret key security validated (score: {score}/7)")
-    
+
     return configured_key
 
 def get_safe_table_name():
     """
     Get validated table name for safe SQL operations.
-    
+
     Returns:
         str: Validated table name or None if invalid
     """
@@ -266,6 +267,9 @@ WEB_DEBUG = get_bool_config("WEB_DEBUG", False)
 
 # Initialize Flask app with secure secret key
 app = Flask(__name__)
+
+# Enable CORS for all domains on all routes (for development)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 # SECURITY: Setup secure Flask secret key with validation
 app.secret_key = setup_secure_flask_secret()
@@ -332,23 +336,23 @@ def get_csrf_token():
 @app.after_request
 def add_security_headers(response):
     """Add comprehensive security headers"""
-    
+
     # Prevent clickjacking
     response.headers['X-Frame-Options'] = 'DENY'
-    
+
     # Prevent MIME sniffing
     response.headers['X-Content-Type-Options'] = 'nosniff'
-    
+
     # XSS Protection
     response.headers['X-XSS-Protection'] = '1; mode=block'
-    
+
     # Referrer Policy
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-    
+
     # HTTPS Strict Transport Security (if using HTTPS)
     if request.is_secure:
         response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains; preload'
-    
+
     # Content Security Policy - Allow jQuery and other CDN sources
     csp_policy = (
         "default-src 'self'; "
@@ -362,8 +366,8 @@ def add_security_headers(response):
         "frame-ancestors 'none';"
     )
     response.headers['Content-Security-Policy'] = csp_policy
-    
-    
+
+
     return response
 
 # Initialize SocketIO for real-time updates
@@ -410,21 +414,21 @@ def login():
     if form.validate_on_submit():
         username = form.username.data
         password = form.password.data
-        
+
         # Secure authentication with bcrypt password hashing only
         admin_password_hash = get_config("ADMIN_PASSWORD_HASH")
         admin_users = get_config("ADMIN_USERS", "admin").split(",")
-        
+
         # SECURITY: Require proper bcrypt hash - no fallback to plain passwords
         if not admin_password_hash:
             flash('Sistem yapılandırması eksik: ADMIN_PASSWORD_HASH gerekli', 'danger')
             return redirect(url_for('login'))
-        
+
         # Validate password strength requirement during setup
         if len(admin_password_hash) < 60:  # bcrypt hashes are ~60 characters
             flash('Geçersiz şifre hash formatı', 'danger')
             return redirect(url_for('login'))
-        
+
         try:
             # Test password verification
             password_match = bcrypt.checkpw(password.encode('utf-8'), admin_password_hash.encode('utf-8'))
@@ -434,18 +438,18 @@ def login():
             print(f"[ERROR] Authentication error: {type(e).__name__}")
             flash('Kimlik doğrulama hatası', 'danger')
             return redirect(url_for('login'))
-        
+
         if username_match and password_match:
             user = User(username)
             login_user(user)
             flash('Başarıyla giriş yaptınız!', 'success')
-            
+
             next_page = request.args.get('next')
             return redirect(next_page) if next_page else redirect(url_for('dashboard'))
         else:
             # Generic error message to prevent username enumeration
             flash('Geçersiz kimlik bilgileri', 'danger')
-    
+
     return render_template('login.html', form=form)
 
 @app.route('/logout')
@@ -477,14 +481,14 @@ def tweets_history():
     page = request.args.get('page', 1, type=int)
     filter_type = request.args.get('filter', 'all')
     per_page = 20
-    
+
     # Get tweets from database with filtering
     tweets, total_count = get_tweets_from_db(page, per_page, filter_type)
     total_pages = (total_count + per_page - 1) // per_page
-    
-    return render_template('tweets.html', 
-                         tweets=tweets, 
-                         page=page, 
+
+    return render_template('tweets.html',
+                         tweets=tweets,
+                         page=page,
                          total_pages=total_pages,
                          filter_type=filter_type,
                          total_count=total_count)
@@ -523,6 +527,7 @@ def prompts():
 
 # API Endpoints
 @app.route('/api/status')
+@csrf.exempt  # Exempt from CSRF for API calls
 def api_status():
     """Get bot current status"""
     update_stats()
@@ -532,24 +537,25 @@ def api_status():
     })
 
 @app.route('/api/control', methods=['POST'])
+@csrf.exempt  # Exempt from CSRF for API calls
 def api_control():
     """Start/stop bot control"""
     global bot_thread, bot_running
-    
+
     # Check if bot modules are loaded
     if not API_MODULES_LOADED:
         return jsonify({"success": False, "message": "Bot modülleri yüklenmedi - API anahtarlarını kontrol edin"}), 400
-    
+
     # Validate request JSON
     if not request.json:
         return jsonify({"success": False, "message": "JSON verisi gerekli"}), 400
-    
+
     action = request.json.get('action')
-    
+
     # Validate action parameter
     if not action or action not in ['start', 'stop']:
         return jsonify({"success": False, "message": "Geçersiz action: 'start' veya 'stop' olmalı"}), 400
-    
+
     with bot_lock:
         if action == 'start' and not bot_running:
             try:
@@ -571,7 +577,7 @@ def api_control():
             except Exception as e:
                 print(f"[!] Error starting bot thread: {e}")
                 return jsonify({"success": False, "message": f"Bot başlatılamadı: {str(e)}"})
-            
+
         elif action == 'stop' and bot_running:
             try:
                 print(f"[INFO] Stopping bot thread...")
@@ -595,7 +601,7 @@ def api_control():
                 return jsonify({"success": True, "message": "Bot durduruldu"})
             except Exception as e:
                 return jsonify({"success": False, "message": f"Bot durdurma hatası: {str(e)}"})
-            
+
         return jsonify({"success": False, "message": "Geçersiz işlem"})
 
 @app.route('/api/tweet', methods=['POST'])
@@ -604,27 +610,27 @@ def api_manual_tweet():
     """Post manual tweet"""
     if not API_MODULES_LOADED or not main:
         return jsonify({"success": False, "message": "Bot modülleri yüklenmedi - API anahtarlarını kontrol edin"}), 400
-    
+
     tweet_text = request.json.get('text')
     persona = request.json.get('persona', 'casual')
-    
+
     # Validate and sanitize input
     tweet_text = sanitize_input(tweet_text)
     is_valid, error_message = validate_tweet_text(tweet_text)
-    
+
     if not is_valid:
         return jsonify({"success": False, "message": error_message})
-    
+
     try:
         # Post tweet using main module function
         status = main.scheduled_tweet(tweet_text)
-        
+
         # Save to database
         database.save_tweets(tweet=tweet_text, tweet_type="manual", status=status)
-        
+
         # Broadcast to all clients
         broadcast_new_tweet(tweet_text, status)
-        
+
         return jsonify({
             "success": status,
             "message": "Tweet gönderildi" if status else "Tweet gönderilemedi"
@@ -721,26 +727,26 @@ def api_retry_tweet(tweet_id):
         safe_table = get_safe_table_name()
         if not safe_table:
             return jsonify({"success": False, "message": "Güvenlik hatası: Geçersiz tablo adı"})
-            
+
         conn = database.get_db_connection()
         if not conn:
             return jsonify({"success": False, "message": "Veritabanı bağlantı hatası"})
-            
+
         try:
             with conn:  # Auto-commit and cleanup
                 cursor = conn.cursor()
-                
+
                 cursor.execute(f"SELECT tweet_text FROM {safe_table} WHERE id = ? AND sent = 0", (tweet_id,))
                 tweet_data = cursor.fetchone()
-                
+
                 if not tweet_data:
                     return jsonify({"success": False, "message": "Tweet bulunamadı veya zaten gönderilmiş"})
-                
+
                 tweet_text = tweet_data[0]
-                
+
                 # Try to post the tweet again
                 status = main.scheduled_tweet(tweet_text)
-                
+
                 if status:
                     # Update database to mark as sent
                     cursor.execute(f"UPDATE {safe_table} SET sent = 1 WHERE id = ?", (tweet_id,))
@@ -749,9 +755,9 @@ def api_retry_tweet(tweet_id):
                     message = "Tweet tekrar gönderilemedi"
         finally:
             conn.close()  # Ensure connection is closed
-            
-            return jsonify({"success": status, "message": message})
-            
+
+        return jsonify({"success": status, "message": message})
+
     except Exception as e:
         return jsonify({"success": False, "message": f"Hata: {str(e)}"})
 
@@ -762,40 +768,40 @@ def api_bulk_retry():
         conn = database.get_db_connection()
         if conn:
             cursor = conn.cursor()
-            
+
             # Get all failed tweets with validated table name
             safe_table = get_safe_table_name()
             if not safe_table:
                 return jsonify({"success": False, "message": "Güvenlik hatası: Geçersiz tablo adı"})
-                
+
             cursor.execute(f"SELECT id, tweet_text FROM {safe_table} WHERE sent = 0")
             failed_tweets = cursor.fetchall()
-            
+
             if not failed_tweets:
                 return jsonify({"success": False, "message": "Tekrar gönderilecek başarısız tweet bulunamadı"})
-            
+
             success_count = 0
             for tweet_id, tweet_text in failed_tweets:
                 # Try to post each failed tweet
                 status = main.scheduled_tweet(tweet_text)
-                
+
                 if status:
                     # Update database
                     cursor.execute(f"UPDATE {safe_table} SET sent = 1 WHERE id = ?", (tweet_id,))
                     success_count += 1
-                
+
                 # Small delay between tweets to avoid rate limiting
                 time.sleep(2)
-            
+
             conn.commit()
             cursor.close()
             conn.close()
-            
+
             return jsonify({
-                "success": True, 
+                "success": True,
                 "message": f"{success_count}/{len(failed_tweets)} tweet başarıyla gönderildi"
             })
-            
+
     except Exception as e:
         return jsonify({"success": False, "message": f"Hata: {str(e)}"})
 
@@ -806,14 +812,14 @@ def api_delete_tweet(tweet_id):
         conn = database.get_db_connection()
         if conn:
             cursor = conn.cursor()
-            
+
             # Delete tweet from database with validated table name
             safe_table = get_safe_table_name()
             if not safe_table:
                 return jsonify({"success": False, "message": "Güvenlik hatası: Geçersiz tablo adı"})
-                
+
             cursor.execute(f"DELETE FROM {safe_table} WHERE id = ?", (tweet_id,))
-            
+
             if cursor.rowcount > 0:
                 conn.commit()
                 message = "Tweet veritabanından silindi"
@@ -821,12 +827,12 @@ def api_delete_tweet(tweet_id):
             else:
                 message = "Tweet bulunamadı"
                 success = False
-            
+
             cursor.close()
             conn.close()
-            
+
             return jsonify({"success": success, "message": message})
-            
+
     except Exception as e:
         return jsonify({"success": False, "message": f"Hata: {str(e)}"})
 
@@ -834,7 +840,7 @@ def api_delete_tweet(tweet_id):
 def debug_env_vars():
     """Debug endpoint to check current environment variables"""
     reload_config()  # Force reload from centralized config
-    
+
     return jsonify({
         'TRENDS_LIMIT': get_config('TRENDS_LIMIT'),
         'SLEEP_HOURS': get_config('SLEEP_HOURS'),
@@ -842,76 +848,76 @@ def debug_env_vars():
         'current_config': get_current_config()
     })
 
-@app.route('/api/config', methods=['GET', 'PUT']) 
+@app.route('/api/config', methods=['GET', 'PUT'])
 @login_required  # Ensure only authenticated users can access
 def api_config():
     """Get or update configuration with security validation"""
     if request.method == 'GET':
         return jsonify(get_current_config())
-    
+
     elif request.method == 'PUT':
         try:
             # SECURITY: Check request content type and size
             if not request.is_json:
                 return jsonify({
-                    'success': False, 
+                    'success': False,
                     'error': 'Invalid content type. JSON required.'
                 }), 400
-            
+
             new_config = request.json
-            
+
             # SECURITY: Check for empty or oversized config
             if not new_config:
                 return jsonify({
                     'success': False,
                     'error': 'Empty configuration provided'
                 }), 400
-                
+
             if len(str(new_config)) > 10000:  # Limit config size
                 return jsonify({
                     'success': False,
                     'error': 'Configuration data too large'
                 }), 400
-            
+
             # SECURITY: Log configuration change attempt (with sanitization)
             secure_log('info', f"Configuration change attempt by user {current_user.id} from IP {request.remote_addr}")
             secure_log('info', "Keys to update", list(new_config.keys()))
-            
+
             # Update token.env file with new configuration
             update_token_env(new_config)
-            
+
             # Reload environment variables for immediate effect
             reload_config()
-            
+
             # Broadcast configuration change to all clients
             socketio.emit('config_updated', {
                 'message': 'Konfigürasyon güncellendi ve otomatik olarak uygulandı!',
                 'config': new_config,
                 'auto_applied': True
             })
-            
+
             return jsonify({
-                "success": True, 
+                "success": True,
                 "message": "Konfigürasyon güncellendi (tüm değerler doğrulandı)",
                 "validated_keys": list(new_config.keys()),
                 "timestamp": datetime.now().isoformat()
             })
-            
+
         except ValueError as validation_error:
             # SECURITY: Log validation failures (sanitized)
             secure_log('warning', f"Configuration validation failed for user {current_user.id}", str(validation_error))
             return jsonify({
-                "success": False, 
+                "success": False,
                 "error": "Configuration validation failed",
                 "details": str(validation_error)
             }), 400
-            
+
         except Exception as e:
             # SECURITY: Log unexpected errors (sanitized)
             secure_log('error', f"Configuration update failed for user {current_user.id}", str(e))
             return jsonify({
-                "success": False, 
-                "error": "Configuration update failed", 
+                "success": False,
+                "error": "Configuration update failed",
                 "details": "Sunucu hatası"
             }), 500
 
@@ -919,25 +925,25 @@ def api_config():
 def api_emergency_stop():
     """Emergency stop - kill all bot processes immediately"""
     global bot_running, bot_thread
-    
+
     try:
         bot_running = False
-        
+
         # Kill bot thread if running
         if bot_thread and bot_thread.is_alive():
             # Force stop thread (in real implementation, use proper thread management)
             pass
-        
+
         # Broadcast emergency stop to all clients
         socketio.emit('emergency_stop', {
             'message': 'ACİL DURDURMA - Tüm bot işlemleri durduruldu',
             'timestamp': datetime.now().strftime("%H:%M:%S")
         })
-        
+
         broadcast_console_log('ERROR', 'ACİL DURDURMA YAPILDI - Bot tüm işlemleri durdurdu')
-        
+
         return jsonify({"success": True, "message": "Acil durdurma başarıyla gerçekleştirildi"})
-        
+
     except Exception as e:
         return jsonify({"success": False, "message": f"Acil durdurma hatası: {str(e)}"})
 
@@ -948,29 +954,29 @@ def api_clear_database():
         conn = database.get_db_connection()
         if conn:
             cursor = conn.cursor()
-            
+
             # Count existing records with validated table name
             safe_table = get_safe_table_name()
             if not safe_table:
                 return jsonify({"success": False, "message": "Güvenlik hatası: Geçersiz tablo adı"})
-                
+
             cursor.execute(f"SELECT COUNT(*) FROM {safe_table}")
             record_count = cursor.fetchone()[0]
-            
+
             # Clear all tweets
             cursor.execute(f"DELETE FROM {safe_table}")
             conn.commit()
-            
+
             cursor.close()
             conn.close()
-            
+
             broadcast_console_log('WARN', f'Veritabanı temizlendi - {record_count} kayıt silindi')
-            
+
             return jsonify({
-                "success": True, 
+                "success": True,
                 "message": f"Veritabanı temizlendi - {record_count} kayıt silindi"
             })
-            
+
     except Exception as e:
         return jsonify({"success": False, "message": f"Veritabanı temizlenemedi: {str(e)}"})
 
@@ -982,22 +988,22 @@ def api_force_tweet():
         trends = get_current_trends()
         if trends:
             selected_trend = trends[0]  # Use first trend
-            
+
             # Generate tweet using AI
             tweet = reply.generate_reply(selected_trend)
-            
+
             if tweet:
                 # Post immediately
                 status = main.scheduled_tweet(tweet)
-                
+
                 # Save to database
                 database.save_tweets(tweet=tweet, tweet_type="forced", status=status)
-                
+
                 # Broadcast to all clients
                 broadcast_new_tweet(tweet, status)
-                broadcast_console_log('SUCCESS' if status else 'ERROR', 
+                broadcast_console_log('SUCCESS' if status else 'ERROR',
                                     f'Zorla tweet {"gönderildi" if status else "gönderilemedi"}: {tweet[:50]}...')
-                
+
                 return jsonify({
                     "success": status,
                     "message": "Tweet zorla gönderildi" if status else "Tweet gönderilemedi",
@@ -1007,7 +1013,7 @@ def api_force_tweet():
                 return jsonify({"success": False, "message": "AI tweet oluşturamadı"})
         else:
             return jsonify({"success": False, "message": "Trending topic bulunamadı"})
-            
+
     except Exception as e:
         return jsonify({"success": False, "message": f"Zorla tweet hatası: {str(e)}"})
 
@@ -1015,16 +1021,19 @@ def api_force_tweet():
 def update_stats():
     """Update bot statistics from database"""
     global bot_stats
+    import datetime as dt
+    from config import get_int_config
+
     try:
         conn = database.get_db_connection()
         if conn:
             cursor = conn.cursor()
-            
+
             # Get last tweet with validated table name
             safe_table = get_safe_table_name()
             if not safe_table:
                 return {}
-                
+
             cursor.execute(f"SELECT tweet_text, created_at FROM {safe_table} ORDER BY created_at DESC LIMIT 1")
             last_tweet = cursor.fetchone()
 
@@ -1032,31 +1041,27 @@ def update_stats():
                 bot_stats["last_tweet"] = last_tweet[0]
                 # Convert UTC to local time for display
                 try:
-                    from datetime import datetime
-                    import datetime as dt
-                    from config import get_int_config
-
-                    utc_time = datetime.strptime(last_tweet[1], "%Y-%m-%d %H:%M:%S")
+                    utc_time = dt.datetime.strptime(last_tweet[1], "%Y-%m-%d %H:%M:%S")
                     # Get timezone offset from config (default: UTC+3 for Turkey)
                     tz_offset = get_int_config("TIMEZONE_OFFSET", 3)
                     local_time = utc_time + dt.timedelta(hours=tz_offset)
                     bot_stats["last_tweet_time"] = local_time.strftime("%Y-%m-%d %H:%M:%S")
                 except:
                     bot_stats["last_tweet_time"] = last_tweet[1]
-            
+
             # Get daily and total tweets count in single optimized query
-            today = datetime.now().strftime("%Y-%m-%d")
+            today = dt.datetime.now().strftime("%Y-%m-%d")
             cursor.execute(f"""
-                SELECT 
+                SELECT
                     COUNT(*) as total_tweets,
                     SUM(CASE WHEN DATE(created_at) = ? THEN 1 ELSE 0 END) as daily_tweets
                 FROM {safe_table}
             """, (today,))
-            
+
             stats_result = cursor.fetchone()
             bot_stats["total_tweets"] = stats_result[0]
             bot_stats["daily_tweets"] = stats_result[1]
-            
+
             cursor.close()
             conn.close()
     except Exception as e:
@@ -1069,11 +1074,11 @@ def get_tweets_from_db(page, per_page, filter_type='all'):
         if conn:
             cursor = conn.cursor()
             offset = (page - 1) * per_page
-            
+
             # Build WHERE clause based on filter
             where_clause = ""
             params = []
-            
+
             if filter_type == 'success':
                 where_clause = "WHERE sent = 1"
             elif filter_type == 'failed':
@@ -1082,33 +1087,33 @@ def get_tweets_from_db(page, per_page, filter_type='all'):
                 where_clause = "WHERE tweet_type = 'manual'"
             elif filter_type == 'auto':
                 where_clause = "WHERE tweet_type = 'tweet'"
-            
+
             # Get total count for pagination with validated table name
             safe_table = get_safe_table_name()
             if not safe_table:
                 return jsonify({"success": False, "message": "Güvenlik hatası: Geçersiz tablo adı"})
-                
+
             # Single optimized query with window function (no separate COUNT query needed)
             params.extend([per_page, offset])
             query = f"""
-                SELECT 
+                SELECT
                     id, tweet_text, tweet_type, sent, tweet_time, tweet_date, created_at,
                     COUNT(*) OVER() as total_count
-                FROM {safe_table} 
+                FROM {safe_table}
                 {where_clause}
-                ORDER BY created_at DESC 
+                ORDER BY created_at DESC
                 LIMIT ? OFFSET ?
             """
-            
+
             cursor.execute(query, params)
             tweets = cursor.fetchall()
-            
+
             # Extract total_count from first row (window function result)
             total_count = tweets[0][7] if tweets else 0  # 8th column (0-indexed) is total_count
-            
+
             # Remove total_count from tweet data (keep only first 7 columns)
             tweets = [tweet[:7] for tweet in tweets]
-            
+
             cursor.close()
             conn.close()
             return tweets, total_count
@@ -1120,7 +1125,7 @@ def get_current_config():
     """Get current bot configuration - always use environment variables for latest values"""
     # Always reload environment variables to get latest values
     reload_config()  # Force reload from centralized config
-    
+
     # URL to country code mapping (reverse of country_urls)
     url_to_country = {
         'https://xtrends.iamrohit.in/turkey': 'turkey',
@@ -1139,10 +1144,10 @@ def get_current_config():
         'https://xtrends.iamrohit.in/brazil': 'brazil',
         'https://xtrends.iamrohit.in/mexico': 'mexico'
     }
-    
+
     current_url = get_config("TRENDS_URL", "https://xtrends.iamrohit.in/turkey")
     trend_country = url_to_country.get(current_url, 'turkey')
-    
+
     # Parse SLEEP_HOURS safely
     sleep_hours_raw = get_config("SLEEP_HOURS", "1,3,9,10")
     # Remove brackets if present
@@ -1179,7 +1184,7 @@ def get_current_config_old():
     if not API_MODULES_LOADED:
         # Reload environment variables to get latest values
         reload_config()
-        
+
         # Return configuration from centralized config
         trends_limit_val = get_config("TRENDS_LIMIT", "3")
         trends_limit_int = int(trends_limit_val)
@@ -1193,7 +1198,7 @@ def get_current_config_old():
             "ai_temperature": float(get_config("AI_TEMPERATURE", "0.85")),
             "ai_model": get_config("GEMINI_MODEL", "gemini-2.5-flash")
         }
-    
+
     return {
         "trends_limit": main.TRENDS_LIMIT,
         "sleep_hours": main.SLEEP_HOURS,
@@ -1209,8 +1214,8 @@ def get_current_trends():
     if not API_MODULES_LOADED or not trend:
         return []
     try:
-        # Use trend limit from configuration
-        trend_limit = get_int_config('TRENDS_LIMIT', 3)
+        # Use trend limit from configuration (increased for dashboard display)
+        trend_limit = get_int_config('TRENDS_LIMIT', 20)
         trends = trend.prepareTrend(trend_limit)
         return trends if trends else []
     except Exception as e:
@@ -1401,7 +1406,7 @@ def validate_config_value(key, value):
     Validate configuration values against expected types and constraints
     Returns: (is_valid: bool, sanitized_value: str, error_message: str)
     """
-    
+
     # Define validation rules for each configuration key
     validation_rules = {
         'trends_limit': {
@@ -1411,7 +1416,7 @@ def validate_config_value(key, value):
             'description': 'Number of trends to fetch'
         },
         'cycle_duration': {
-            'type': int, 
+            'type': int,
             'min': 1,
             'max': 1440,  # Max 24 hours
             'description': 'Cycle duration in minutes'
@@ -1424,7 +1429,7 @@ def validate_config_value(key, value):
         },
         'night_mode_end': {
             'type': int,
-            'min': 0, 
+            'min': 0,
             'max': 23,
             'description': 'Night mode end hour'
         },
@@ -1446,7 +1451,7 @@ def validate_config_value(key, value):
         'trend_country': {
             'type': str,
             'allowed_values': [
-                'turkey', 'usa', 'uk', 'germany', 'france', 'italy', 
+                'turkey', 'usa', 'uk', 'germany', 'france', 'italy',
                 'spain', 'netherlands', 'canada', 'australia', 'japan',
                 'korea', 'india', 'brazil', 'mexico'
             ],
@@ -1516,56 +1521,56 @@ def validate_config_value(key, value):
             'description': 'Flask secret key for session security'
         }
     }
-    
+
     # Check if key is allowed
     if key not in validation_rules:
         return False, "", f"Configuration key '{key}' is not allowed"
-    
+
     rule = validation_rules[key]
-    
+
     try:
         # Type validation and conversion
         if rule['type'] == int:
             if isinstance(value, str) and not value.strip():
                 return False, "", f"{rule['description']} cannot be empty"
             sanitized = int(value)
-            
+
             # Range validation
             if 'min' in rule and sanitized < rule['min']:
                 return False, "", f"{rule['description']} must be >= {rule['min']}"
             if 'max' in rule and sanitized > rule['max']:
                 return False, "", f"{rule['description']} must be <= {rule['max']}"
-                
+
         elif rule['type'] == float:
             if isinstance(value, str) and not value.strip():
                 return False, "", f"{rule['description']} cannot be empty"
             sanitized = float(value)
-            
-            # Range validation  
+
+            # Range validation
             if 'min' in rule and sanitized < rule['min']:
                 return False, "", f"{rule['description']} must be >= {rule['min']}"
             if 'max' in rule and sanitized > rule['max']:
                 return False, "", f"{rule['description']} must be <= {rule['max']}"
-                
+
         elif rule['type'] == str:
             sanitized = str(value).strip()
-            
+
             # Length validation
             if 'min_length' in rule and len(sanitized) < rule['min_length']:
                 return False, "", f"{rule['description']} must be at least {rule['min_length']} characters"
             if 'max_length' in rule and len(sanitized) > rule['max_length']:
                 return False, "", f"{rule['description']} must be at most {rule['max_length']} characters"
-            
+
             # Pattern validation
             if 'pattern' in rule:
                 import re
                 if not re.match(rule['pattern'], sanitized):
                     return False, "", f"{rule['description']} contains invalid characters"
-                    
+
             # Allowed values validation
             if 'allowed_values' in rule and sanitized not in rule['allowed_values']:
                 return False, "", f"{rule['description']} must be one of: {', '.join(rule['allowed_values'])}"
-                
+
         elif rule['type'] == list:
             if isinstance(value, str):
                 # Handle comma-separated string
@@ -1577,13 +1582,13 @@ def validate_config_value(key, value):
                 sanitized = value
             else:
                 return False, "", f"{rule['description']} must be a list or comma-separated string"
-            
+
             # List size validation
             if 'min_elements' in rule and len(sanitized) < rule['min_elements']:
                 return False, "", f"{rule['description']} must have at least {rule['min_elements']} elements"
             if 'max_elements' in rule and len(sanitized) > rule['max_elements']:
                 return False, "", f"{rule['description']} must have at most {rule['max_elements']} elements"
-            
+
             # Element validation
             if 'element_type' in rule:
                 validated_elements = []
@@ -1601,7 +1606,7 @@ def validate_config_value(key, value):
                     except (ValueError, TypeError):
                         return False, "", f"{rule['description']} contains invalid element: {element}"
                 sanitized = validated_elements
-        
+
         # Special validation for Flask secret key
         if key == 'flask_secret_key':
             is_strong, issues, score = validate_secret_key_strength(sanitized)
@@ -1610,9 +1615,9 @@ def validate_config_value(key, value):
             elif not is_strong:
                 # Log warnings but accept the key
                 secure_log('warning', f"Flask secret key has issues (score: {score}/7): {'; '.join(issues)}")
-        
+
         return True, str(sanitized), ""
-        
+
     except (ValueError, TypeError) as e:
         return False, "", f"Invalid {rule['description']}: {str(e)}"
 
@@ -1622,7 +1627,7 @@ def update_token_env(new_config):
         # SECURITY: Validate all input values before processing
         validated_config = {}
         validation_errors = []
-        
+
         for key, value in new_config.items():
             is_valid, sanitized_value, error_msg = validate_config_value(key, value)
             if not is_valid:
@@ -1631,17 +1636,17 @@ def update_token_env(new_config):
             else:
                 validated_config[key] = sanitized_value
                 secure_log('debug', f"Validated {key}", sanitized_value)
-        
+
         # If there are validation errors, reject the entire update
         if validation_errors:
             error_summary = "; ".join(validation_errors)
             raise ValueError(f"Configuration validation failed: {error_summary}")
-        
+
         secure_log('info', f"All {len(validated_config)} configuration values validated successfully")
         # Read current token.env file
         with open('token.env', 'r', encoding='utf-8') as f:
             lines = f.readlines()
-        
+
         # Configuration mappings
         config_mappings = {
             'sleep_hours': 'SLEEP_HOURS',
@@ -1662,7 +1667,7 @@ def update_token_env(new_config):
             'gemini_api_key': 'gemini_api_key',
             'flask_secret_key': 'FLASK_SECRET_KEY'
         }
-        
+
         # Country to URL mappings
         country_urls = {
             'turkey': 'https://xtrends.iamrohit.in/turkey',
@@ -1702,17 +1707,17 @@ def update_token_env(new_config):
                         value = country_urls.get(country, country_urls['turkey'])
                     else:
                         value = str(validated_config[config_key])
-                    
+
                     # SECURITY: Additional sanitization for environment variables
                     # Remove any potentially dangerous characters
                     sanitized_value = value.replace('\n', '').replace('\r', '').replace('\0', '')
                     updated_lines.append(f"{env_key}={sanitized_value}\n")
                     line_updated = True
                     break
-            
+
             if not line_updated:
                 updated_lines.append(line)
-        
+
         # Handle sleep_hours separately (already validated)
         if 'sleep_hours' in validated_config:
             sleep_hours_updated = False
@@ -1728,7 +1733,7 @@ def update_token_env(new_config):
                     updated_lines[i] = f"SLEEP_HOURS={sanitized_value}\n"
                     sleep_hours_updated = True
                     break
-        
+
         # SECURITY: Create backup before modifying file
         backup_filename = 'token.env.backup'
         try:
@@ -1737,18 +1742,18 @@ def update_token_env(new_config):
                     backup.write(original.read())
         except Exception as backup_error:
             print(f"[WARNING] Could not create backup: {backup_error}")
-        
+
         # Write validated configuration back to file
         with open('token.env', 'w', encoding='utf-8') as f:
             f.writelines(updated_lines)
-        
+
         # Log security event (sanitized)
         secure_log('info', f"Configuration updated in token.env with {len(validated_config)} validated values")
         secure_log('info', "Updated keys", list(validated_config.keys()))
-        
+
         # Force reload of centralized configuration
         reload_config()
-        
+
     except Exception as e:
         secure_log('error', "Error updating token.env", str(e))
         raise
@@ -1761,25 +1766,25 @@ def api_analytics_success_rate():
         analytics_memory_cleanup()  # Periodic memory cleanup
         conn = sqlite3.connect(database.dbName)
         cursor = conn.cursor()
-        
+
         # Get success rate data by day for last 30 days
         cursor.execute("""
-            SELECT 
+            SELECT
                 DATE(created_at) as date,
                 COUNT(*) as total_tweets,
                 SUM(CASE WHEN sent = 1 THEN 1 ELSE 0 END) as successful_tweets,
                 ROUND(
                     (SUM(CASE WHEN sent = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*)), 2
                 ) as success_rate
-            FROM tweets 
+            FROM tweets
             WHERE created_at >= datetime('now', '-30 days')
-            GROUP BY DATE(created_at) 
+            GROUP BY DATE(created_at)
             ORDER BY date DESC
         """)
-        
+
         results = cursor.fetchall()
         conn.close()
-        
+
         # Format data for Chart.js
         data = {
             'labels': [row[0] for row in reversed(results)],
@@ -1792,13 +1797,13 @@ def api_analytics_success_rate():
                 'fill': True
             }]
         }
-        
+
         return jsonify({
             'success': True,
             'data': data,
             'total_days': len(results)
         })
-        
+
     except Exception as e:
         return jsonify({
             'success': False,
@@ -1812,22 +1817,22 @@ def api_analytics_personas():
         analytics_memory_cleanup()  # Periodic memory cleanup
         conn = sqlite3.connect(database.dbName)
         cursor = conn.cursor()
-        
+
         # Get persona usage counts
         cursor.execute("""
-            SELECT 
+            SELECT
                 tweet_type,
                 COUNT(*) as count,
                 ROUND((COUNT(*) * 100.0 / (SELECT COUNT(*) FROM tweets)), 2) as percentage
-            FROM tweets 
+            FROM tweets
             WHERE created_at >= datetime('now', '-30 days')
-            GROUP BY tweet_type 
+            GROUP BY tweet_type
             ORDER BY count DESC
         """)
-        
+
         results = cursor.fetchall()
         conn.close()
-        
+
         # Persona display names
         persona_names = {
             'tech': 'Teknik',
@@ -1835,7 +1840,7 @@ def api_analytics_personas():
             'sad': 'Üzgün',
             'default': 'Varsayılan'
         }
-        
+
         # Format data for Chart.js pie chart
         data = {
             'labels': [persona_names.get(row[0], row[0]) for row in results],
@@ -1856,7 +1861,7 @@ def api_analytics_personas():
                 'borderWidth': 1
             }]
         }
-        
+
         return jsonify({
             'success': True,
             'data': data,
@@ -1868,7 +1873,7 @@ def api_analytics_personas():
                 } for row in results
             ]
         })
-        
+
     except Exception as e:
         return jsonify({
             'success': False,
@@ -1882,26 +1887,26 @@ def api_analytics_hourly_activity():
         analytics_memory_cleanup()  # Periodic memory cleanup
         conn = sqlite3.connect(database.dbName)
         cursor = conn.cursor()
-        
+
         # Get tweet counts by hour for last 7 days
         cursor.execute("""
-            SELECT 
+            SELECT
                 CAST(strftime('%H', created_at) AS INTEGER) as hour,
                 COUNT(*) as tweet_count
-            FROM tweets 
+            FROM tweets
             WHERE created_at >= datetime('now', '-7 days')
-            GROUP BY hour 
+            GROUP BY hour
             ORDER BY hour
         """)
-        
+
         results = cursor.fetchall()
         conn.close()
-        
+
         # Create 24-hour data array (0-23)
         hourly_data = [0] * 24
         for hour, count in results:
             hourly_data[hour] = count
-        
+
         # Format data for Chart.js heatmap/bar chart
         data = {
             'labels': [f"{i:02d}:00" for i in range(24)],
@@ -1909,21 +1914,21 @@ def api_analytics_hourly_activity():
                 'label': 'Tweet Sayısı',
                 'data': hourly_data,
                 'backgroundColor': [
-                    f'rgba(29, 161, 242, {min(0.1 + (count / max(hourly_data or [1])) * 0.9, 1)})' 
+                    f'rgba(29, 161, 242, {min(0.1 + (count / max(hourly_data or [1])) * 0.9, 1)})'
                     for count in hourly_data
                 ],
                 'borderColor': 'rgba(29, 161, 242, 1)',
                 'borderWidth': 1
             }]
         }
-        
+
         return jsonify({
             'success': True,
             'data': data,
             'peak_hour': hourly_data.index(max(hourly_data)) if hourly_data else 0,
             'total_tweets': sum(hourly_data)
         })
-        
+
     except Exception as e:
         return jsonify({
             'success': False,
@@ -1938,27 +1943,27 @@ def api_analytics_trending_topics():
         analytics_memory_cleanup()
         conn = sqlite3.connect(database.dbName)
         cursor = conn.cursor()
-        
+
         # Get most common words/topics from tweet content
         cursor.execute("""
-            SELECT 
+            SELECT
                 tweet_text,
                 COUNT(*) as frequency,
                 DATE(created_at) as last_used
-            FROM tweets 
+            FROM tweets
             WHERE created_at >= datetime('now', '-30 days')
             AND sent = 1
             ORDER BY frequency DESC
             LIMIT 20
         """)
-        
+
         results = cursor.fetchall()
         conn.close()
-        
+
         # Simple word extraction with memory leak protection
         word_frequency = {}
         max_unique_words = 1000  # Limit to prevent unbounded memory growth
-        
+
         for content, freq, last_used in results:
             if content and len(word_frequency) < max_unique_words:
                 # Basic word extraction
@@ -1969,16 +1974,16 @@ def api_analytics_trending_topics():
                     clean_word = re.sub(r'[^\w\sğüşıöçĞÜŞİÖÇ]', '', word)
                     if len(clean_word) > 3 and not clean_word.startswith('http'):
                         word_frequency[clean_word] = word_frequency.get(clean_word, 0) + freq
-                        
+
                         # Additional protection: stop if dictionary gets too large
                         if len(word_frequency) >= max_unique_words:
                             print(f"[WARNING] Word frequency dictionary reached limit ({max_unique_words} words)")
                             break
-        
+
         # Get top 15 words and clear large dictionary immediately
         sorted_words = sorted(word_frequency.items(), key=lambda x: x[1], reverse=True)[:15]
         word_frequency.clear()  # Explicit cleanup to prevent memory retention
-        
+
         # Format for word cloud visualization
         data = {
             'labels': [word for word, freq in sorted_words],
@@ -1986,22 +1991,22 @@ def api_analytics_trending_topics():
                 'label': 'Kullanım Sıklığı',
                 'data': [freq for word, freq in sorted_words],
                 'backgroundColor': [
-                    f'rgba({29 + i*10}, {161 - i*5}, {242 - i*8}, 0.7)' 
+                    f'rgba({29 + i*10}, {161 - i*5}, {242 - i*8}, 0.7)'
                     for i in range(len(sorted_words))
                 ],
                 'borderColor': 'rgba(29, 161, 242, 1)',
                 'borderWidth': 1
             }]
         }
-        
+
         # Memory cleanup and monitoring
         gc.collect()  # Force garbage collection to free memory
-        
+
         return jsonify({
             'success': True,
             'data': data,
             'word_cloud_data': [
-                {'text': word, 'size': freq} 
+                {'text': word, 'size': freq}
                 for word, freq in sorted_words
             ],
             'memory_stats': {
@@ -2009,7 +2014,7 @@ def api_analytics_trending_topics():
                 'memory_cleaned': True
             }
         })
-        
+
     except Exception as e:
         return jsonify({
             'success': False,
@@ -2024,23 +2029,23 @@ def api_export_database():
     try:
         conn = sqlite3.connect(database.dbName)
         cursor = conn.cursor()
-        
+
         # Export tweets table
         cursor.execute("SELECT * FROM tweets")
         tweets = cursor.fetchall()
-        
+
         # Get column names
         cursor.execute("PRAGMA table_info(tweets)")
         columns = [row[1] for row in cursor.fetchall()]
-        
+
         conn.close()
-        
+
         # Convert to list of dictionaries
         tweets_data = []
         for tweet in tweets:
             tweet_dict = dict(zip(columns, tweet))
             tweets_data.append(tweet_dict)
-        
+
         # Create export data structure
         export_data = {
             'export_info': {
@@ -2054,13 +2059,13 @@ def api_export_database():
                 'table_name': 'tweets'
             }
         }
-        
+
         return jsonify({
             'success': True,
             'data': export_data,
             'filename': f"twitter_bot_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         })
-        
+
     except Exception as e:
         return jsonify({
             'success': False,
@@ -2073,29 +2078,29 @@ def api_import_database():
     """Import database from JSON backup"""
     try:
         import_data = request.get_json()
-        
+
         if not import_data or 'tweets' not in import_data:
             return jsonify({
                 'success': False,
                 'message': 'Geçersiz import verisi'
             }), 400
-        
+
         conn = sqlite3.connect(database.dbName)
         cursor = conn.cursor()
-        
+
         # Get existing tweet IDs to avoid duplicates
         cursor.execute("SELECT id FROM tweets")
         existing_ids = set(row[0] for row in cursor.fetchall())
-        
+
         imported_count = 0
         skipped_count = 0
-        
+
         # Import tweets
         for tweet_data in import_data['tweets']:
             if tweet_data.get('id') in existing_ids:
                 skipped_count += 1
                 continue
-            
+
             # Insert tweet (let SQLite auto-generate ID if not provided)
             cursor.execute("""
                 INSERT INTO tweets (tweet_text, tweet_type, sent, created_at)
@@ -2107,17 +2112,17 @@ def api_import_database():
                 tweet_data.get('created_at', datetime.now().isoformat())
             ))
             imported_count += 1
-        
+
         conn.commit()
         conn.close()
-        
+
         return jsonify({
             'success': True,
             'message': f'Import tamamlandı: {imported_count} tweet eklendi, {skipped_count} tweet atlandı',
             'imported': imported_count,
             'skipped': skipped_count
         })
-        
+
     except Exception as e:
         return jsonify({
             'success': False,
@@ -2159,12 +2164,12 @@ def api_get_prompts():
                 'is_active': bool(prompt[4]),
                 'updated_at': prompt[5]
             })
-        
+
         return jsonify({
             'success': True,
             'prompts': prompt_list
         })
-        
+
     except Exception as e:
         return jsonify({
             'success': False,
@@ -2179,15 +2184,15 @@ def api_update_prompt(prompt_type):
         data = request.get_json()
         prompt_text = sanitize_input(data.get('prompt_text'))
         description = sanitize_input(data.get('description', ''))
-        
+
         if not prompt_text:
             return jsonify({
                 'success': False,
                 'message': 'Prompt metni gerekli'
             }), 400
-        
+
         success = database.update_prompt(prompt_type, prompt_text, description)
-        
+
         if success:
             return jsonify({
                 'success': True,
@@ -2198,7 +2203,7 @@ def api_update_prompt(prompt_type):
                 'success': False,
                 'message': 'Prompt güncelleme başarısız'
             }), 500
-            
+
     except Exception as e:
         return jsonify({
             'success': False,
@@ -2211,7 +2216,7 @@ def api_toggle_prompt(prompt_type):
     """Toggle prompt active status"""
     try:
         success = database.toggle_prompt_status(prompt_type)
-        
+
         if success:
             return jsonify({
                 'success': True,
@@ -2222,7 +2227,7 @@ def api_toggle_prompt(prompt_type):
                 'success': False,
                 'message': 'Prompt durumu değiştirilemedi'
             }), 500
-            
+
     except Exception as e:
         return jsonify({
             'success': False,
@@ -2235,7 +2240,7 @@ def api_get_persona_settings():
     """Get all persona settings"""
     try:
         settings = database.get_persona_settings()
-        
+
         # Format settings for frontend
         formatted_settings = []
         setting_descriptions = {
@@ -2247,18 +2252,18 @@ def api_get_persona_settings():
             'max_tweet_length': 'Maksimum tweet karakter sayısı',
             'interaction_style': 'Etkileşim tarzı'
         }
-        
+
         # Turkish display names
         display_names = {
             'persona_name': 'İsim',
-            'persona_age': 'Yaş', 
+            'persona_age': 'Yaş',
             'persona_location': 'Konum',
             'persona_personality': 'Kişilik',
             'persona_language': 'Dil',
             'max_tweet_length': 'Maksimum Tweet Uzunluğu',
             'interaction_style': 'Etkileşim Tarzı'
         }
-        
+
         for key, value in settings.items():
             formatted_settings.append({
                 'setting_key': key,
@@ -2266,12 +2271,12 @@ def api_get_persona_settings():
                 'description': setting_descriptions.get(key, ''),
                 'display_name': display_names.get(key, key.replace('persona_', '').replace('_', ' ').title())
             })
-        
+
         return jsonify({
             'success': True,
             'settings': formatted_settings
         })
-        
+
     except Exception as e:
         return jsonify({
             'success': False,
@@ -2285,15 +2290,15 @@ def api_update_persona_setting(setting_key):
     try:
         data = request.get_json()
         setting_value = sanitize_input(data.get('setting_value'))
-        
+
         if not setting_value:
             return jsonify({
                 'success': False,
                 'message': 'Ayar değeri gerekli'
             }), 400
-        
+
         success = database.update_persona_setting(setting_key, setting_value)
-        
+
         if success:
             return jsonify({
                 'success': True,
@@ -2304,7 +2309,7 @@ def api_update_persona_setting(setting_key):
                 'success': False,
                 'message': 'Ayar güncelleme başarısız'
             }), 500
-            
+
     except Exception as e:
         return jsonify({
             'success': False,
@@ -2412,24 +2417,24 @@ def get_recent_activity():
     try:
         conn = sqlite3.connect(database.dbName)
         cursor = conn.cursor()
-        
+
         # Get last 5 tweets with their details
         cursor.execute("""
             SELECT tweet_text, tweet_type, sent, created_at, tweet_time
-            FROM tweets 
-            ORDER BY id DESC 
+            FROM tweets
+            ORDER BY id DESC
             LIMIT 5
         """)
-        
+
         tweets = cursor.fetchall()
         conn.close()
-        
+
         activities = []
-        
+
         if tweets:
             for tweet in tweets:
                 text, tweet_type, success, created_at, time = tweet
-                
+
                 # Generate activity entry based on tweet data
                 if success:
                     activity = {
@@ -2445,9 +2450,9 @@ def get_recent_activity():
                         'message': f'Tweet gönderilemeđi: "{text[:50]}{"..." if len(text) > 50 else ""}"',
                         'type': 'error'
                     }
-                
+
                 activities.append(activity)
-        
+
         # Add some simulated bot activities if no tweets
         if not activities:
             from datetime import datetime
@@ -2466,12 +2471,12 @@ def get_recent_activity():
                     'type': 'info'
                 }
             ]
-        
+
         return jsonify({
             'success': True,
             'activities': activities[:5]  # Max 5 activity
         })
-        
+
     except Exception as e:
         return jsonify({
             'success': False,
@@ -2483,12 +2488,12 @@ def get_database_stats():
     """Get database file size and record count"""
     try:
         import os
-        
+
         # Get database file size
         db_path = database.dbName
         if os.path.exists(db_path):
             size_bytes = os.path.getsize(db_path)
-            
+
             # Format size
             if size_bytes < 1024:
                 size_str = f"{size_bytes} B"
@@ -2498,20 +2503,20 @@ def get_database_stats():
                 size_str = f"{size_bytes / (1024 * 1024):.1f} MB"
         else:
             size_str = "0 KB"
-        
+
         # Get total tweet count
         conn = sqlite3.connect(database.dbName)
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM tweets")
         total_tweets = cursor.fetchone()[0]
         conn.close()
-        
+
         return jsonify({
             'success': True,
             'size': size_str,
             'total_tweets': f"{total_tweets:,}".replace(',', '.')  # Turkish number format
         })
-        
+
     except Exception as e:
         return jsonify({
             'success': False,
@@ -2531,52 +2536,52 @@ def handle_csrf_error(e):
 @app.errorhandler(404)
 def not_found_error(error):
     """Handle 404 errors"""
-    return render_template('error.html', 
-                         error_code=404, 
+    return render_template('error.html',
+                         error_code=404,
                          error_message="Sayfa bulunamadı"), 404
 
 @app.errorhandler(500)
 def internal_error(error):
     """Handle 500 errors"""
-    return render_template('error.html', 
-                         error_code=500, 
+    return render_template('error.html',
+                         error_code=500,
                          error_message="Sunucu hatası"), 500
 
 # Input validation utilities
 def calculate_twitter_length(text):
     """
     Calculate the actual length of a tweet accounting for Twitter's URL shortening.
-    
+
     Twitter automatically shortens URLs to t.co links:
     - HTTP URLs: 23 characters
-    - HTTPS URLs: 23 characters  
+    - HTTPS URLs: 23 characters
     - Media URLs: 23 characters (additional)
-    
+
     Returns:
         int: Calculated tweet length according to Twitter's counting rules
     """
     import re
-    
+
     # Twitter's current t.co URL length (as of 2024)
     TCO_URL_LENGTH = 23
-    
+
     # Find all URLs in the text
     url_pattern = r'https?://[^\s]+'
     urls = re.findall(url_pattern, text)
-    
+
     # Start with the original text length
     calculated_length = len(text)
-    
+
     # Find mentions and hashtags for reporting
     mentions = re.findall(r'@\w+', text)
     hashtags = re.findall(r'#\w+', text)
-    
+
     # Replace each URL with Twitter's t.co equivalent length
     for url in urls:
         original_url_length = len(url)
         # Subtract original URL length and add t.co length
         calculated_length = calculated_length - original_url_length + TCO_URL_LENGTH
-    
+
     return {
         'length': calculated_length,
         'url_count': len(urls),
@@ -2591,23 +2596,23 @@ def validate_tweet_text(text):
     """Validate tweet text input with proper Twitter length calculation"""
     if not text or not text.strip():
         return False, "Tweet metni boş olamaz"
-    
+
     # Use Twitter's actual character counting rules
     twitter_metrics = calculate_twitter_length(text)
     twitter_length = twitter_metrics['length']
-    
+
     if twitter_length > 280:
         return False, f"Tweet {twitter_length} karakter (280 limit, URL'ler t.co olarak sayılır)"
-    
+
     # Check for extremely long tweets (probably an error)
     if len(text) > 2000:
         return False, "Tweet çok uzun (muhtemelen hata)"
-    
+
     # Remove potentially harmful content
     import re
     if re.search(r'<script|javascript:|data:', text, re.IGNORECASE):
         return False, "Geçersiz karakter dizisi"
-    
+
     # Create detailed validation message
     message = f"Geçerli ({twitter_length}/280 karakter)"
     if twitter_metrics['url_count'] > 0:
@@ -2616,7 +2621,7 @@ def validate_tweet_text(text):
         message += f", {twitter_metrics['mention_count']} mention"
     if twitter_metrics['hashtag_count'] > 0:
         message += f", {twitter_metrics['hashtag_count']} hashtag"
-    
+
     return True, message
 
 def test_twitter_length_calculation():
@@ -2625,11 +2630,11 @@ def test_twitter_length_calculation():
         ("Hello world!", 12),
         ("Check this out: https://example.com/very-long-url-that-will-be-shortened", 23 + 17),  # URL shortened to 23
         ("@username how are you?", 20),  # Mention counts as full
-        ("#hashtag #trending now", 19),  # Hashtags count as full  
+        ("#hashtag #trending now", 19),  # Hashtags count as full
         ("Visit https://example.com and https://test.com", 23 + 5 + 23),  # Two URLs
         ("Hello @user1 @user2 #tech https://example.com", len("Hello @user1 @user2 #tech ") + 23),
     ]
-    
+
     print("[INFO] Testing Twitter length calculation:")
     for text, expected in test_cases:
         result = calculate_twitter_length(text)
@@ -2642,29 +2647,29 @@ def test_twitter_length_calculation():
             print(f"    Mentions: {result['mentions']}")
         if result['hashtag_count'] > 0:
             print(f"    Hashtags: {result['hashtags']}")
-    
+
     return True
 
 def sanitize_input(text):
     """Sanitize user input"""
     if not text:
         return ""
-    
+
     # Remove HTML tags and scripts
     import re
     text = re.sub(r'<[^>]*>', '', text)
     text = re.sub(r'javascript:', '', text, flags=re.IGNORECASE)
     text = re.sub(r'data:', '', text, flags=re.IGNORECASE)
-    
+
     return text.strip()
 
 if __name__ == '__main__':
     # Initialize database
     database.createDatabase()
-    
+
     print(f"Starting AI-TwitterPersona Web Dashboard...")
     print(f"Dashboard will be available at: http://{WEB_HOST}:{WEB_PORT}")
     print(f"Real-time updates enabled via WebSocket")
-    
+
     # Run Flask-SocketIO development server
     socketio.run(app, host=WEB_HOST, port=WEB_PORT, debug=WEB_DEBUG)
