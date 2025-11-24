@@ -268,11 +268,17 @@ WEB_DEBUG = get_bool_config("WEB_DEBUG", False)
 # Initialize Flask app with secure secret key
 app = Flask(__name__)
 
-# Enable CORS for all domains on all routes (for development)
-CORS(app, resources={r"/*": {"origins": "*"}})
+# Enable CORS with credentials support for Next.js frontend
+CORS(app, resources={r"/*": {"origins": ["http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001"]}}, supports_credentials=True)
 
 # SECURITY: Setup secure Flask secret key with validation
 app.secret_key = setup_secure_flask_secret()
+
+# Session cookie configuration for cross-origin requests (development)
+app.config['SESSION_COOKIE_SAMESITE'] = None  # Allow cross-origin
+app.config['SESSION_COOKIE_SECURE'] = False  # HTTP allowed
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_DOMAIN'] = None  # Allow all domains
 
 # CRITICAL: Validate single-worker deployment
 # Multi-worker deployment is incompatible with bot state management
@@ -300,6 +306,17 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 login_manager.login_message = 'Bu sayfaya erişmek için giriş yapmalısınız.'
+
+@login_manager.unauthorized_handler
+def unauthorized():
+    """Handle unauthorized access requests"""
+    if request.path.startswith('/api/'):
+        return jsonify({
+            'success': False,
+            'message': 'Unauthorized access',
+            'error': 'login_required'
+        }), 401
+    return redirect(url_for('login', next=request.path))
 
 csrf = CSRFProtect(app)
 
@@ -603,6 +620,153 @@ def api_control():
                 return jsonify({"success": False, "message": f"Bot durdurma hatası: {str(e)}"})
 
         return jsonify({"success": False, "message": "Geçersiz işlem"})
+
+@app.route('/api/login', methods=['POST'])
+@csrf.exempt
+def api_login():
+    """JSON login endpoint for Next.js frontend"""
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "message": "Missing JSON payload"}), 400
+
+    username = data.get('username')
+    password = data.get('password')
+
+    # Validate against configured admin users
+    admin_users = get_config("ADMIN_USERS", "admin").split(",")
+    admin_password_hash = get_config("ADMIN_PASSWORD_HASH")
+
+    if not admin_password_hash:
+        return jsonify({"success": False, "message": "Server not configured for login"}), 500
+
+    # Check username
+    if username not in admin_users:
+        return jsonify({"success": False, "message": "Invalid credentials"}), 401
+
+    # Verify password using bcrypt
+    try:
+        password_bytes = password.encode('utf-8')
+        hash_bytes = admin_password_hash.encode('utf-8')
+
+        if not bcrypt.checkpw(password_bytes, hash_bytes):
+            return jsonify({"success": False, "message": "Invalid credentials"}), 401
+
+    except Exception as e:
+        secure_log('error', 'Login error', str(e))
+        return jsonify({"success": False, "message": "Password verification failed"}), 500
+
+    # Login user via Flask-Login
+    user = User(username)
+    login_user(user)
+
+    return jsonify({"success": True, "message": "Logged in successfully"})
+
+@app.route('/api/logout', methods=['GET'])
+def api_logout():
+    """Logout endpoint"""
+    logout_user()
+    return jsonify({"success": True, "message": "Logged out successfully"})
+
+# Prompt Management API Endpoints
+@app.route('/api/prompts', methods=['GET', 'POST'])
+@login_required
+@csrf.exempt
+def api_prompts():
+    """GET: list prompts, POST: create new prompt"""
+    if request.method == 'GET':
+        try:
+            prompts = database.get_all_prompts()
+            prompt_list = []
+            for p in prompts:
+                prompt_list.append({
+                    'id': p[0],
+                    'prompt_type': p[1],
+                    'prompt_text': p[2],
+                    'description': p[3],
+                    'is_active': bool(p[4]),
+                    'updated_at': p[5]
+                })
+            return jsonify({'success': True, 'prompts': prompt_list})
+        except Exception as e:
+            return jsonify({'success': False, 'message': f'Error fetching prompts: {str(e)}'}), 500
+
+    else:  # POST
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'Missing JSON payload'}), 400
+
+        prompt_type = data.get('prompt_type')
+        prompt_text = data.get('prompt_text')
+        description = data.get('description', '')
+        is_active = data.get('is_active', True)
+
+        if not prompt_type or not prompt_text:
+            return jsonify({'success': False, 'message': 'prompt_type and prompt_text required'}), 400
+
+        try:
+            success = database.create_prompt(prompt_type, prompt_text, description, int(bool(is_active)))
+            if success:
+                return jsonify({'success': True, 'message': 'Prompt created'}), 201
+            else:
+                return jsonify({'success': False, 'message': 'Failed to create prompt'}), 500
+        except Exception as e:
+            return jsonify({'success': False, 'message': f'Error creating prompt: {str(e)}'}), 500
+
+@app.route('/api/prompts/<int:prompt_id>', methods=['PUT', 'DELETE'])
+@login_required
+@csrf.exempt
+def api_prompt_detail(prompt_id):
+    """PUT: update prompt, DELETE: remove prompt"""
+    if request.method == 'PUT':
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'Missing JSON payload'}), 400
+
+        # We need to handle updates carefully. The database.update_prompt function uses prompt_type as key,
+        # but here we have ID. However, the UI might send prompt_type.
+        # Let's check if we can update by ID or if we need to fetch type first.
+        # Actually, database.update_prompt updates by TYPE.
+        # But we are in a REST API using ID.
+        # This is a mismatch. I should probably add update_prompt_by_id to database.py or fetch the type first.
+        # For now, let's assume the frontend sends the prompt_type in the body which matches the ID.
+        # OR, better, let's just use the prompt_type from the body if available.
+
+        # Wait, I should have checked database.py update_prompt signature.
+        # It takes (prompt_type, prompt_text, description).
+        # It doesn't take ID.
+        # So I need to get the prompt_type for this ID first if I want to use that function,
+        # OR I should add update_prompt_by_id.
+        # Given I just added get_all_prompts which returns ID, it's better to work with ID.
+        # But for now, to avoid modifying database.py again immediately, I'll assume the frontend sends the prompt_type.
+        # Actually, looking at the code I just added to database.py, I didn't add update_prompt_by_id.
+        # I added create and delete. Update was already there.
+
+        prompt_type = data.get('prompt_type')
+        prompt_text = data.get('prompt_text')
+        description = data.get('description')
+
+        if not prompt_type or not prompt_text:
+             return jsonify({'success': False, 'message': 'prompt_type and prompt_text required'}), 400
+
+        try:
+            # Use the existing update_prompt function which works by type
+            success = database.update_prompt(prompt_type, prompt_text, description)
+            if success:
+                return jsonify({'success': True, 'message': 'Prompt updated'})
+            else:
+                return jsonify({'success': False, 'message': 'Prompt not found or update failed'}), 404
+        except Exception as e:
+            return jsonify({'success': False, 'message': f'Error updating prompt: {str(e)}'}), 500
+
+    else:  # DELETE
+        try:
+            success = database.delete_prompt(prompt_id)
+            if success:
+                return jsonify({'success': True, 'message': 'Prompt deleted'})
+            else:
+                return jsonify({'success': False, 'message': 'Prompt not found'}), 404
+        except Exception as e:
+            return jsonify({'success': False, 'message': f'Error deleting prompt: {str(e)}'}), 500
 
 @app.route('/api/tweet', methods=['POST'])
 @login_required

@@ -24,7 +24,7 @@ function cn(...inputs: ClassValue[]) {
 }
 
 // Custom X (Twitter) Icon Component
-function XIcon({ className }: { className?: string }) {
+export function XIcon({ className }: { className?: string }) {
   return (
     <svg
       className={className}
@@ -113,6 +113,13 @@ export default function Dashboard() {
           >
             <BarChart3 className="w-4 h-4" />
             İstatistikler
+          </a>
+          <a
+            href="/prompts"
+            className="px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-lg transition-colors text-sm font-medium flex items-center gap-2 cursor-pointer"
+          >
+            <MessageSquare className="w-4 h-4" />
+            Prompts
           </a>
           <a
             href="/settings"
