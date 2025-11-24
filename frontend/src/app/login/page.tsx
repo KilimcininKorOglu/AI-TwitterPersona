@@ -30,7 +30,7 @@ export default function LoginPage() {
 
       if (res.ok && data.success) {
         // Redirect to prompts page on success
-        window.location.href = '/prompts';
+        router.push('/prompts');
       } else {
         setError(data.message || 'Giriş başarısız');
       }
