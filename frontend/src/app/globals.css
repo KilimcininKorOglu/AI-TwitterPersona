@@ -1,0 +1,63 @@
+@font-face {
+  font-family: GalanoGrotesqueBold;
+  src: url(/fonts/GalanoGrotesqueBold.otf) format("opentype");
+  font-style: normal;
+}
+
+@font-face {
+  font-family: GalanoGrotesqueMedium;
+  src: url(/fonts/GalanoGrotesqueMedium.otf) format("opentype");
+  font-style: normal;
+}
+
+@font-face {
+  font-family: GalanoGrotesqueSemiBold;
+  src: url(/fonts/GalanoGrotesqueSemiBold.otf) format("opentype");
+  font-style: normal;
+}
+
+@import "tailwindcss";
+
+@theme {
+  --color-background: hsl(224 71% 4%);
+  --color-foreground: hsl(213 31% 91%);
+
+  --color-card: hsl(224 71% 4%);
+  --color-card-foreground: hsl(213 31% 91%);
+
+  --color-popover: hsl(224 71% 4%);
+  --color-popover-foreground: hsl(213 31% 91%);
+
+  --color-primary: hsl(210 40% 98%);
+  --color-primary-foreground: hsl(222.2 47.4% 11.2%);
+
+  --color-secondary: hsl(217.2 32.6% 17.5%);
+  --color-secondary-foreground: hsl(210 40% 98%);
+
+  --color-muted: hsl(217.2 32.6% 17.5%);
+  --color-muted-foreground: hsl(215 20.2% 65.1%);
+
+  --color-accent: hsl(217.2 32.6% 17.5%);
+  --color-accent-foreground: hsl(210 40% 98%);
+
+  --color-destructive: hsl(0 62.8% 30.6%);
+  --color-destructive-foreground: hsl(210 40% 98%);
+
+  --color-border: hsl(217.2 32.6% 17.5%);
+  --color-input: hsl(217.2 32.6% 17.5%);
+  --color-ring: hsl(212.7 26.8% 83.9%);
+
+  --font-galano-bold: GalanoGrotesqueBold, ui-serif;
+  --font-galano-medium: GalanoGrotesqueMedium, ui-serif;
+  --font-galano-semibold: GalanoGrotesqueSemiBold, ui-serif;
+  --font-sans: GalanoGrotesqueMedium, system-ui, -apple-system, sans-serif;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

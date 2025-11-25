@@ -167,11 +167,43 @@ token.env
 .env.local
 .env.production
 
+# Security and authentication files
+cookies.txt
+*.cookies
+session.txt
+*.session
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+
+# Secret keys and tokens
+secret_key.txt
+flask_secret.txt
+*.secret
+*_secret
+*_token
+auth_token.txt
+
+# Credentials
+credentials.json
+credentials.txt
+*.credentials
+
 # Database files
 twitter.db
 *.db
 *.sqlite
 *.sqlite3
+
+# SQLite WAL (Write-Ahead Logging) files
+*.db-shm
+*.db-wal
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite3-shm
+*.sqlite3-wal
 
 # Cache files
 topic_cache.json
