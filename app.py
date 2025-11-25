@@ -544,7 +544,7 @@ def prompts():
 
 # API Endpoints
 @app.route('/api/status')
-@csrf.exempt  # Exempt from CSRF for API calls
+@login_required
 def api_status():
     """Get bot current status"""
     update_stats()
@@ -554,7 +554,7 @@ def api_status():
     })
 
 @app.route('/api/control', methods=['POST'])
-@csrf.exempt  # Exempt from CSRF for API calls
+@login_required
 def api_control():
     """Start/stop bot control"""
     global bot_thread, bot_running
@@ -670,7 +670,6 @@ def api_logout():
 # Prompt Management API Endpoints
 @app.route('/api/prompts', methods=['GET', 'POST'])
 @login_required
-@csrf.exempt
 def api_prompts():
     """GET: list prompts, POST: create new prompt"""
     if request.method == 'GET':
@@ -714,7 +713,6 @@ def api_prompts():
 
 @app.route('/api/prompts/<int:prompt_id>', methods=['PUT', 'DELETE'])
 @login_required
-@csrf.exempt
 def api_prompt_detail(prompt_id):
     """PUT: update prompt, DELETE: remove prompt"""
     if request.method == 'PUT':
@@ -884,7 +882,7 @@ def api_trends():
     return jsonify({"trends": trends})
 
 @app.route('/api/analytics/success_rate')
-@csrf.exempt
+@login_required
 def api_analytics_success_rate():
     """Get tweet success rate statistics"""
     try:
@@ -915,7 +913,7 @@ def api_analytics_success_rate():
         return jsonify({"success": False, "message": str(e)})
 
 @app.route('/api/analytics/personas')
-@csrf.exempt
+@login_required
 def api_analytics_personas():
     """Get persona usage statistics"""
     try:
@@ -940,7 +938,7 @@ def api_analytics_personas():
         return jsonify({"success": False, "message": str(e)})
 
 @app.route('/api/analytics/hourly_activity')
-@csrf.exempt
+@login_required
 def api_analytics_hourly():
     """Get hourly activity statistics"""
     try:
@@ -974,7 +972,7 @@ def api_analytics_hourly():
         return jsonify({"success": False, "message": str(e)})
 
 @app.route('/api/config', methods=['GET', 'POST'])
-@csrf.exempt
+@login_required
 def api_config():
     """Get or update bot configuration"""
     if request.method == 'GET':
@@ -1018,7 +1016,7 @@ def api_config():
             return jsonify({"success": False, "message": str(e)})
 
 @app.route('/api/tweets')
-@csrf.exempt
+@login_required
 def api_tweets():
     """Get paginated tweets with filtering"""
     try:
@@ -1051,7 +1049,7 @@ def api_tweets():
         return jsonify({"success": False, "message": str(e)})
 
 @app.route('/api/delete_tweet/<int:tweet_id>', methods=['DELETE'])
-@csrf.exempt
+@login_required
 def api_delete_tweet(tweet_id):
     """Delete a tweet by ID"""
     try:
@@ -1078,6 +1076,7 @@ def api_delete_tweet(tweet_id):
         return jsonify({"success": False, "message": f"Hata: {str(e)}"})
 
 @app.route('/api/retry_tweet/<int:tweet_id>', methods=['POST'])
+@login_required
 def api_retry_tweet(tweet_id):
     """Retry failed tweet by ID"""
     try:
@@ -1120,6 +1119,7 @@ def api_retry_tweet(tweet_id):
         return jsonify({"success": False, "message": f"Hata: {str(e)}"})
 
 @app.route('/api/bulk_retry', methods=['POST'])
+@login_required
 def api_bulk_retry():
     """Retry all failed tweets"""
     try:
@@ -1164,6 +1164,7 @@ def api_bulk_retry():
         return jsonify({"success": False, "message": f"Hata: {str(e)}"})
 
 @app.route('/api/debug/env', methods=['GET'])
+@login_required
 def debug_env_vars():
     """Debug endpoint to check current environment variables"""
     reload_config()  # Force reload from centralized config
@@ -1177,6 +1178,7 @@ def debug_env_vars():
 
 
 @app.route('/api/emergency_stop', methods=['POST'])
+@login_required
 def api_emergency_stop():
     """Emergency stop - kill all bot processes immediately"""
     global bot_running, bot_thread
@@ -1203,6 +1205,7 @@ def api_emergency_stop():
         return jsonify({"success": False, "message": f"Acil durdurma hatası: {str(e)}"})
 
 @app.route('/api/clear_database', methods=['POST'])
+@login_required
 def api_clear_database():
     """Clear all tweets from database"""
     try:
@@ -1236,6 +1239,7 @@ def api_clear_database():
         return jsonify({"success": False, "message": f"Veritabanı temizlenemedi: {str(e)}"})
 
 @app.route('/api/force_tweet', methods=['POST'])
+@login_required
 def api_force_tweet():
     """Force immediate tweet generation and posting"""
     try:

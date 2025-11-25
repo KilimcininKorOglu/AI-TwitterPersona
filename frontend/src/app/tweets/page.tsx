@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { apiFetch } from "../../lib/api";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -59,13 +60,17 @@ export default function TweetsPage() {
   const fetchTweets = async () => {
     setLoading(true);
     try {
-      const res = await fetch(
-        `http://127.0.0.1:5000/api/tweets?filter=${filter}&page=${page}&per_page=20`
+      const res = await apiFetch(
+        `/api/tweets?filter=${filter}&page=${page}&per_page=20`
       );
       const data = await res.json();
       setTweets(data.tweets || []);
       setTotalCount(data.total || 0);
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.status === 401) {
+        router.push("/login");
+        return;
+      }
       console.error("Failed to fetch tweets:", error);
     } finally {
       setLoading(false);
@@ -82,7 +87,7 @@ export default function TweetsPage() {
     if (!confirm("Bu tweet'i tekrar göndermek istediğinizden emin misiniz?")) return;
 
     try {
-      const res = await fetch(`http://127.0.0.1:5000/api/retry_tweet/${tweetId}`, {
+      const res = await apiFetch(`/api/retry_tweet/${tweetId}`, {
         method: "POST",
       });
       const data = await res.json();
@@ -92,7 +97,11 @@ export default function TweetsPage() {
       } else {
         alert("Hata: " + data.message);
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.status === 401) {
+        router.push("/login");
+        return;
+      }
       console.error("Retry error:", error);
     }
   };
@@ -101,7 +110,7 @@ export default function TweetsPage() {
     if (!confirm("Bu tweet'i silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.")) return;
 
     try {
-      const res = await fetch(`http://127.0.0.1:5000/api/delete_tweet/${tweetId}`, {
+      const res = await apiFetch(`/api/delete_tweet/${tweetId}`, {
         method: "DELETE",
       });
       const data = await res.json();
@@ -111,7 +120,11 @@ export default function TweetsPage() {
       } else {
         alert("Hata: " + data.message);
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.status === 401) {
+        router.push("/login");
+        return;
+      }
       console.error("Delete error:", error);
     }
   };

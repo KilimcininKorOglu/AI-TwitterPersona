@@ -13,6 +13,7 @@ import {
   Shield,
   Zap
 } from "lucide-react";
+import { apiFetch } from "../../lib/api";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -35,12 +36,16 @@ export default function SettingsPage() {
 
   const fetchConfig = async () => {
     try {
-      const res = await fetch("http://127.0.0.1:5000/api/config");
+      const res = await apiFetch("/api/config");
       const data = await res.json();
       if (data.success) {
         setConfig(data.config);
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.status === 401) {
+        router.push("/login");
+        return;
+      }
       console.error("Config fetch error:", error);
     } finally {
       setLoading(false);
@@ -50,11 +55,8 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const res = await fetch("http://127.0.0.1:5000/api/config", {
+      const res = await apiFetch("/api/config", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify(config),
       });
       const data = await res.json();
@@ -63,7 +65,11 @@ export default function SettingsPage() {
       } else {
         alert("Hata: " + data.message);
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.status === 401) {
+        router.push("/login");
+        return;
+      }
       console.error("Config save error:", error);
       alert("Kaydetme sırasında bir hata oluştu.");
     } finally {

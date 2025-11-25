@@ -14,6 +14,7 @@ import {
   ToggleLeft,
   ToggleRight
 } from 'lucide-react';
+import { apiFetch } from '../../lib/api';
 
 interface Prompt {
   id: number;
@@ -48,20 +49,18 @@ export default function PromptsPage() {
   const fetchPrompts = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/prompts', {
-        credentials: 'include'
-      });
-      if (res.status === 401) {
-        router.push('/login');
-        return;
-      }
+      const res = await apiFetch('/api/prompts');
       const data = await res.json();
       if (data.success) {
         setPrompts(data.prompts);
       } else {
         setError(data.message || 'Promptlar yüklenemedi');
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.status === 401) {
+        router.push('/login');
+        return;
+      }
       setError('Bağlantı hatası');
       console.error(err);
     } finally {
@@ -108,12 +107,8 @@ export default function PromptsPage() {
 
       const method = editingPrompt ? 'PUT' : 'POST';
 
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
         body: JSON.stringify(formData),
       });
 
@@ -125,7 +120,11 @@ export default function PromptsPage() {
       } else {
         setError(data.message || 'İşlem başarısız');
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.status === 401) {
+        router.push('/login');
+        return;
+      }
       setError('Bir hata oluştu');
     } finally {
       setSaving(false);
@@ -136,9 +135,8 @@ export default function PromptsPage() {
     if (!confirm('Bu promptu silmek istediğinize emin misiniz?')) return;
 
     try {
-      const res = await fetch(`/api/prompts/${id}`, {
+      const res = await apiFetch(`/api/prompts/${id}`, {
         method: 'DELETE',
-        credentials: 'include'
       });
       const data = await res.json();
       if (data.success) {
@@ -146,7 +144,11 @@ export default function PromptsPage() {
       } else {
         alert(data.message || 'Silme başarısız');
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.status === 401) {
+        router.push('/login');
+        return;
+      }
       alert('Silme işleminde hata oluştu');
     }
   };
@@ -159,9 +161,8 @@ export default function PromptsPage() {
       );
       setPrompts(updatedPrompts);
 
-      const res = await fetch(`/api/prompts/${prompt.prompt_type}/toggle`, {
+      const res = await apiFetch(`/api/prompts/${prompt.prompt_type}/toggle`, {
         method: 'POST',
-        credentials: 'include'
       });
       const data = await res.json();
 
@@ -170,7 +171,11 @@ export default function PromptsPage() {
         fetchPrompts();
         alert(data.message || 'Durum değiştirilemedi');
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.status === 401) {
+        router.push('/login');
+        return;
+      }
       fetchPrompts();
       alert('Bağlantı hatası');
     }

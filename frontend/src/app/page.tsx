@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Activity,
   BarChart3,
@@ -18,6 +19,7 @@ import {
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { apiFetch } from "../lib/api";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -40,6 +42,7 @@ export function XIcon({ className }: { className?: string }) {
 }
 
 export default function Dashboard() {
+  const router = useRouter();
   const [status, setStatus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -48,15 +51,19 @@ export default function Dashboard() {
 
   const fetchStatus = async () => {
     try {
-      const res = await fetch("http://127.0.0.1:5000/api/status");
+      const res = await apiFetch("/api/status");
       const data = await res.json();
       setStatus(data);
 
       // Fetch trends
-      const trendsRes = await fetch("http://127.0.0.1:5000/api/trends");
+      const trendsRes = await apiFetch("/api/trends");
       const trendsData = await trendsRes.json();
       setTrends(trendsData.trends || []);
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.status === 401) {
+        router.push("/login");
+        return;
+      }
       console.error("Failed to fetch status:", error);
     } finally {
       setLoading(false);
@@ -73,13 +80,16 @@ export default function Dashboard() {
   const handleControl = async (action: "start" | "stop") => {
     setRefreshing(true);
     try {
-      await fetch("http://127.0.0.1:5000/api/control", {
+      await apiFetch("/api/control", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
       });
       await fetchStatus();
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.status === 401) {
+        router.push("/login");
+        return;
+      }
       console.error("Control error:", error);
     } finally {
       setRefreshing(false);
@@ -424,14 +434,14 @@ export default function Dashboard() {
 function ManualTweet() {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const router = useRouter();
 
   const handleSend = async () => {
     if (!text.trim()) return;
     setSending(true);
     try {
-      const res = await fetch("http://127.0.0.1:5000/api/tweet", {
+      const res = await apiFetch("/api/tweet", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, persona: "casual" }),
       });
       const data = await res.json();
@@ -441,7 +451,11 @@ function ManualTweet() {
       } else {
         alert("Tweet gönderilemedi: " + data.message);
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.status === 401) {
+        router.push("/login");
+        return;
+      }
       console.error("Tweet error:", error);
       alert("Tweet gönderme hatası");
     } finally {

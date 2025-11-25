@@ -27,6 +27,7 @@ import {
   XAxis,
   YAxis
 } from "recharts";
+import { apiFetch } from "../../lib/api";
 
 export default function AnalyticsPage() {
   const router = useRouter();
@@ -48,9 +49,9 @@ export default function AnalyticsPage() {
   const fetchAnalytics = async () => {
     try {
       const [successRes, personaRes, hourlyRes] = await Promise.all([
-        fetch("/api/analytics/success_rate"),
-        fetch("/api/analytics/personas"),
-        fetch("/api/analytics/hourly_activity")
+        apiFetch("/api/analytics/success_rate"),
+        apiFetch("/api/analytics/personas"),
+        apiFetch("/api/analytics/hourly_activity")
       ]);
 
       const successJson = await successRes.json();
@@ -79,7 +80,11 @@ export default function AnalyticsPage() {
         mostUsedPersona: topPersona
       });
 
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.status === 401) {
+        router.push("/login");
+        return;
+      }
       console.error("Analytics fetch error:", error);
     } finally {
       setLoading(false);

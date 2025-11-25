@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { XIcon } from '../page'; // Reusing the X icon from the dashboard
+import { API_BASE } from '../../lib/api';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -17,7 +18,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/login', {
+      const res = await fetch(`${API_BASE}/api/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
