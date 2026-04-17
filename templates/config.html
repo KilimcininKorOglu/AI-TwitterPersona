@@ -181,6 +181,15 @@
                 <h5><i class="fas fa-brain"></i> Gemini AI Ayarları</h5>
             </div>
             <div class="card-body">
+                <!-- SocketIO CORS Origins -->
+                <div class="mb-3">
+                    <label for="socketio-cors-allowed-origins" class="form-label">SocketIO İzin Verilen Kökenler (CORS)</label>
+                    <input type="text" class="form-control" id="socketio-cors-allowed-origins" name="socketio_cors_allowed_origins"
+                           value="{{ config.socketio_cors_allowed_origins|join(',') }}"
+                           placeholder="http://localhost:5000,https://myapp.com">
+                    <div class="form-text">Virgülle ayrılmış liste. Sadece kendi alan adınızdan erişim için boş bırakın.</div>
+                </div>
+
                 <div class="mb-3">
                     <label for="gemini-api-key" class="form-label">Gemini API Key</label>
                     <input type="password" class="form-control" id="gemini-api-key" name="gemini_api_key"
@@ -423,7 +432,8 @@
                 access_token_secret: document.getElementById('access-token-secret').value,
                 bearer_token: document.getElementById('bearer-token').value,
                 user_id: document.getElementById('user-id').value,
-                gemini_api_key: document.getElementById('gemini-api-key').value
+                gemini_api_key: document.getElementById('gemini-api-key').value,
+                socketio_cors_allowed_origins: document.getElementById('socketio-cors-allowed-origins').value
             };
             
             // Debug: Log all values to see which one is undefined

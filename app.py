@@ -9,7 +9,7 @@ import bcrypt
 import threading
 import time
 import os
-from config import get_config, get_int_config, get_bool_config, reload_config  # Centralized configuration
+from config import get_config, get_int_config, get_bool_config, get_list_config, reload_config  # Centralized configuration
 import sqlite3
 from datetime import datetime
 import json
@@ -367,7 +367,8 @@ def add_security_headers(response):
     return response
 
 # Initialize SocketIO for real-time updates
-socketio = SocketIO(app, cors_allowed_origins="*")
+# SECURITY: Use configurable allowed origins instead of wildcard
+socketio = SocketIO(app, cors_allowed_origins=get_list_config("SOCKETIO_CORS_ALLOWED_ORIGINS", []))
 
 # Global bot control variables with thread safety
 bot_thread = None
@@ -1170,7 +1171,8 @@ def get_current_config():
         "access_token_secret": get_config("access_token_secret", ""),
         "bearer_token": get_config("bearer_token", ""),
         "user_id": get_config("USER_ID", ""),
-        "gemini_api_key": get_config("gemini_api_key", "")
+        "gemini_api_key": get_config("gemini_api_key", ""),
+        "socketio_cors_allowed_origins": get_list_config("SOCKETIO_CORS_ALLOWED_ORIGINS", [])
     }
 
 def get_current_config_old():
@@ -1514,6 +1516,11 @@ def validate_config_value(key, value):
             'min_length': 32,
             'max_length': 500,
             'description': 'Flask secret key for session security'
+        },
+        'socketio_cors_allowed_origins': {
+            'type': list,
+            'element_type': str,
+            'description': 'Allowed origins for SocketIO'
         }
     }
     
@@ -1660,7 +1667,8 @@ def update_token_env(new_config):
             'bearer_token': 'bearer_token',
             'user_id': 'USER_ID',
             'gemini_api_key': 'gemini_api_key',
-            'flask_secret_key': 'FLASK_SECRET_KEY'
+            'flask_secret_key': 'FLASK_SECRET_KEY',
+            'socketio_cors_allowed_origins': 'SOCKETIO_CORS_ALLOWED_ORIGINS'
         }
         
         # Country to URL mappings
@@ -1688,8 +1696,8 @@ def update_token_env(new_config):
             line_updated = False
             for config_key, env_key in config_mappings.items():
                 if line.startswith(f"{env_key}=") and config_key in validated_config:
-                    if config_key == 'sleep_hours':
-                        # Handle sleep_hours as comma-separated list
+                    if config_key == 'sleep_hours' or config_key == 'socketio_cors_allowed_origins':
+                        # Handle list types as comma-separated list
                         if isinstance(validated_config[config_key], str):
                             # Already validated as string
                             value = validated_config[config_key]
