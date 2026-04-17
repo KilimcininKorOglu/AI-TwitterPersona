@@ -306,36 +306,26 @@ def run_bot():
         elif tweet:
             print(f"Tweet: {tweet}")
 
-            # Auto-approve tweet posting (manual approval option commented out)
-            option = "y"  # Automatic approval for autonomous operation
+            # Post the tweet to Twitter
+            status = scheduled_tweet(tweet)
             
-            if "y" == option:
-                # Post the tweet to Twitter
-                status = scheduled_tweet(tweet)
-                
-                # Log the tweet attempt to database (success or failure)
-                database.save_tweets(tweet=tweet, tweet_type="tweet", status=status)
-                
-                # If tweet posting failed, continue to next cycle
-                if not status:
-                    continue
-                
-                # Successfully posted - begin sleep cycle
-                print(f"[+] Bot Cycle Complete. Sleeping for {CYCLE_DURATION_MINUTES} minutes... ---\n")
-                
-                # Convert minutes to seconds for sleep timer
-                timer = 60 * CYCLE_DURATION_MINUTES
-                
-                # Countdown timer with live display
-                for i in range(timer + 1):
-                    print(f"[+]Remaining Time [{timer-i}] ", end="\r")
-                    time.sleep(1)  # Sleep for 1 second intervals
-                    
-            elif option == "n":
-                continue  # Skip this cycle (unused in automatic mode)
-            elif option == "exit":
-                quit()    # Exit bot (unused in automatic mode)
-                break
+            # Log the tweet attempt to database (success or failure)
+            database.save_tweets(tweet=tweet, tweet_type="tweet", status=status)
+
+            # If tweet posting failed, continue to next cycle
+            if not status:
+                continue
+
+            # Successfully posted - begin sleep cycle
+            print(f"[+] Bot Cycle Complete. Sleeping for {CYCLE_DURATION_MINUTES} minutes... ---\n")
+
+            # Convert minutes to seconds for sleep timer
+            timer = 60 * CYCLE_DURATION_MINUTES
+
+            # Countdown timer with live display
+            for i in range(timer + 1):
+                print(f"[+]Remaining Time [{timer-i}] ", end="\r")
+                time.sleep(1)  # Sleep for 1 second intervals
                 
             print("\n")  # Add newline after cycle completion
         else:
