@@ -264,7 +264,7 @@ def run_bot():
             
         # Generate AI-powered tweet using the prepared prompt
         print("Generating Reply...Topic: ", prompt)
-        tweet = reply.generate_reply(prompt)
+        tweet, persona = reply.generate_reply_with_persona(prompt)
 
         # Check if tweet is None (political topic)
         if tweet is None:
@@ -283,7 +283,7 @@ def run_bot():
                 status = scheduled_tweet(tweet)
                 
                 # Log the tweet attempt to database (success or failure)
-                database.save_tweets(tweet=tweet, tweet_type="tweet", status=status)
+                database.save_tweets(tweet=tweet, tweet_type="tweet", status=status, persona=persona)
                 
                 # If tweet posting failed, wait and continue to next cycle
                 if not status:

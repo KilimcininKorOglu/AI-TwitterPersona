@@ -607,6 +607,8 @@ def api_control():
             
         return jsonify({"success": False, "message": "Geçersiz işlem"})
 
+PERSONA_TYPES = ('tech', 'casual', 'sad')  # Persona prompt types stored with tweets
+
 @app.route('/api/tweet', methods=['POST'])
 @login_required
 def api_manual_tweet():
@@ -629,7 +631,8 @@ def api_manual_tweet():
         status = main.scheduled_tweet(tweet_text)
         
         # Save to database
-        database.save_tweets(tweet=tweet_text, tweet_type="manual", status=status)
+        database.save_tweets(tweet=tweet_text, tweet_type="manual", status=status,
+                             persona=persona if persona in PERSONA_TYPES else None)
         
         # Broadcast to all clients
         broadcast_new_tweet(tweet_text, status)
@@ -984,14 +987,14 @@ def api_force_tweet():
             selected_trend = trends[0]  # Use first trend
             
             # Generate tweet using AI
-            tweet = reply.generate_reply(selected_trend)
+            tweet, persona = reply.generate_reply_with_persona(selected_trend)
             
             if tweet:
                 # Post immediately
                 status = main.scheduled_tweet(tweet)
                 
                 # Save to database
-                database.save_tweets(tweet=tweet, tweet_type="forced", status=status)
+                database.save_tweets(tweet=tweet, tweet_type="forced", status=status, persona=persona)
                 
                 # Broadcast to all clients
                 broadcast_new_tweet(tweet, status)
@@ -1248,11 +1251,11 @@ def run_bot_thread(stop_event):
                 broadcast_console_log('INFO', f'Generating AI tweet for: {str(topic)[:100] if topic else "general topic"}')
 
                 if hasattr(main, 'reply') and main.reply:
-                    tweet = main.reply.generate_reply(prompt)
+                    tweet, persona = main.reply.generate_reply_with_persona(prompt)
                 else:
                     # Fallback if reply module not available
                     import reply
-                    tweet = reply.generate_reply(prompt)
+                    tweet, persona = reply.generate_reply_with_persona(prompt)
 
                 # Check if tweet is None (political topic)
                 if tweet is None:
@@ -1273,7 +1276,7 @@ def run_bot_thread(stop_event):
                     status = main.scheduled_tweet(tweet)
 
                     # Save to database
-                    database.save_tweets(tweet=tweet, tweet_type="tweet", status=status)
+                    database.save_tweets(tweet=tweet, tweet_type="tweet", status=status, persona=persona)
 
                     if status:
                         print(f"[{datetime.now().strftime('%H:%M:%S')}] Tweet posted successfully!")
@@ -1787,15 +1790,16 @@ def api_analytics_personas():
         conn = sqlite3.connect(database.dbName)
         cursor = conn.cursor()
         
-        # Get persona usage counts
+        # Get persona usage counts; the percentage uses the same 30-day window as the counts
         cursor.execute("""
-            SELECT 
-                tweet_type,
+            SELECT
+                persona,
                 COUNT(*) as count,
-                ROUND((COUNT(*) * 100.0 / (SELECT COUNT(*) FROM tweets)), 2) as percentage
-            FROM tweets 
+                ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) as percentage
+            FROM tweets
             WHERE created_at >= datetime('now', '-30 days')
-            GROUP BY tweet_type 
+            AND persona IS NOT NULL
+            GROUP BY persona
             ORDER BY count DESC
         """)
         

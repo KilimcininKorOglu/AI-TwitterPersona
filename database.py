@@ -123,9 +123,16 @@ def createDatabase():
                     tweet_time TEXT,
                     tweet_date TEXT,
                     tweet_day TEXT,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    persona VARCHAR(20)
                 );"""
         cursor.execute(tableQuery)
+
+        # Migration: tables created before the persona column existed
+        existing_columns = {row[1] for row in cursor.execute(f"PRAGMA table_info({tableName})")}
+        if 'persona' not in existing_columns:
+            cursor.execute(f"ALTER TABLE {tableName} ADD COLUMN persona VARCHAR(20)")
+            print(f"[+] Added persona column to {tableName}")
         db.commit()  # Save changes to database
         print(f"[+] Database- {dbName} and Table- {tableName} Created.")
         
@@ -220,15 +227,16 @@ Maksimum {max_tweet_length} karakter. Tek tweet.""",
             cursor.close()
         db.close()
 
-def save_tweets(tweet, tweet_type, status):
+def save_tweets(tweet, tweet_type, status, persona=None):
     """
     Save a tweet record to the database with timestamp and status information.
-    
+
     Args:
         tweet (str): The tweet content/text
         tweet_type (str): Type of tweet (typically 'tweet')
         status (bool): Whether the tweet was successfully posted to Twitter
-        
+        persona (str, optional): Persona used for the tweet (tech/casual/sad)
+
     Returns:
         None: Prints success/error message to console
     """
@@ -249,15 +257,15 @@ def save_tweets(tweet, tweet_type, status):
             # SQL query to insert tweet record using parameterized query for security
             # Note: Table name is validated against whitelist, so f-string is safe here
             query = f"""
-                    INSERT INTO {tableName} (tweet_text,tweet_type,sent,tweet_time,tweet_date,tweet_day)
-                    VALUES (?,?,?,?,?,?)
+                    INSERT INTO {tableName} (tweet_text,tweet_type,sent,tweet_time,tweet_date,tweet_day,persona)
+                    VALUES (?,?,?,?,?,?,?)
                 """
-            
+
             # Get current timestamp components
             tweet_time, date, day = get_tweet_time()
-            
+
             # Prepare values tuple for database insertion
-            values = (tweet, tweet_type, status, tweet_time, date, day)
+            values = (tweet, tweet_type, status, tweet_time, date, day, persona)
             
             # Execute query with parameterized values (prevents SQL injection)
             cursor.execute(query, values)

@@ -298,12 +298,24 @@ def generate_reply(user_input):
         user_input (str): The topic or trending subject to generate a tweet about
 
     Returns:
-        str: Generated tweet text (max 285 characters), None for political topics, or empty string on error
+        str: Generated tweet text (max 280 characters), None for political topics, or empty string on error
+    """
+    return generate_reply_with_persona(user_input)[0]
+
+def generate_reply_with_persona(user_input):
+    """
+    Generate a tweet like generate_reply and also return the persona it used.
+
+    Args:
+        user_input (str): The topic or trending subject to generate a tweet about
+
+    Returns:
+        tuple: (tweet text, None or empty string as in generate_reply; persona type or None)
     """
     # Initialize Gemini if not already done
     if not initialize_gemini():
         print("[!] Cannot generate reply: Gemini API not initialized")
-        return ""
+        return "", None
 
     # Classify the topic to determine appropriate persona
     topic = detect_topic_type(user_input)
@@ -311,20 +323,32 @@ def generate_reply(user_input):
     # Skip political topics
     if topic == "political":
         print(f"[!] Political topic detected, skipping: {user_input[:50]}...")
-        return None  # Return None to indicate political topic should be skipped
+        return None, topic  # None indicates the political topic should be skipped
 
     # Get the corresponding persona prompt from database
     active_prompts = database.get_active_prompts_dict()
-    
+
     # Use database prompts only - if database fails, don't generate tweet
     if not active_prompts or topic not in active_prompts:
         print(f"[!] Error: No prompt found for '{topic}' persona in database")
         print(f"[!] Please configure prompts via web interface at /prompts")
-        return ""  # Return empty string to indicate failure
-    
-    persona = active_prompts[topic]
+        return "", topic  # Empty string indicates failure
+
     print(f"[+] Using database prompt for '{topic}' persona")
-    
+    return generate_text_for_persona(user_input, active_prompts[topic]), topic
+
+def generate_text_for_persona(user_input, persona):
+    """
+    Generate tweet text with Gemini for one persona prompt.
+
+    Args:
+        user_input (str): The topic or trending subject to generate a tweet about
+        persona (str): Formatted persona prompt
+
+    Returns:
+        str: Generated tweet text, or empty string on error or when it is too long
+    """
+
     # Start a new conversation with Gemini AI
     convo = model.start_chat(history=[])
     
