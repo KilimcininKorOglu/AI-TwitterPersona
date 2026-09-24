@@ -2336,16 +2336,18 @@ def get_realtime_stats():
         cursor.close()
         conn.close()
 
-        # Calculate bot uptime
-        if bot_stats["running"] and bot_stats["start_time"]:
-            start_time = datetime.fromisoformat(bot_stats["start_time"])
+        # Calculate bot uptime (bot_start_time is server local time from datetime.now())
+        start_time_text = bot_stats.get("bot_start_time")
+        is_running = bot_running and bool(start_time_text)
+        if is_running:
+            start_time = datetime.strptime(start_time_text, "%Y-%m-%d %H:%M:%S")
             uptime_seconds = int((datetime.now() - start_time).total_seconds())
             stats['bot_uptime'] = uptime_seconds
         else:
             stats['bot_uptime'] = 0
 
         # Calculate next tweet time
-        if bot_stats["running"] and bot_stats["start_time"]:
+        if is_running:
             cycle_minutes = get_int_config("CYCLE_DURATION_MINUTES", 60)
 
             # Find last tweet time
@@ -2357,9 +2359,11 @@ def get_realtime_stats():
             conn.close()
 
             if last_tweet:
+                # created_at is UTC, so compare it with the current UTC time
                 last_tweet_time = datetime.fromisoformat(last_tweet[0].replace(' ', 'T'))
                 next_run = last_tweet_time + timedelta(minutes=cycle_minutes)
-                time_remaining = (next_run - datetime.now()).total_seconds()
+                utc_now = datetime.now(timezone.utc).replace(tzinfo=None)
+                time_remaining = (next_run - utc_now).total_seconds()
 
                 if time_remaining > 0:
                     minutes = int(time_remaining // 60)
