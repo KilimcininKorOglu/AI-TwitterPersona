@@ -1752,6 +1752,7 @@ def update_token_env(new_config):
 
 # Analytics API endpoints
 @app.route('/api/analytics/success_rate')
+@login_required
 def api_analytics_success_rate():
     """Get tweet success rate data for charts"""
     try:
@@ -1803,6 +1804,7 @@ def api_analytics_success_rate():
         }), 500
 
 @app.route('/api/analytics/personas')
+@login_required
 def api_analytics_personas():
     """Get persona usage statistics"""
     try:
@@ -1873,6 +1875,7 @@ def api_analytics_personas():
         }), 500
 
 @app.route('/api/analytics/hourly_activity')
+@login_required
 def api_analytics_hourly_activity():
     """Get hourly posting activity data"""
     try:
@@ -1928,6 +1931,7 @@ def api_analytics_hourly_activity():
         }), 500
 
 @app.route('/api/analytics/trending_topics')
+@login_required
 def api_analytics_trending_topics():
     """Get popular trending topics data with memory leak protection"""
     try:
@@ -2404,6 +2408,7 @@ def get_realtime_stats():
         })
 
 @app.route('/api/activity', methods=['GET'])
+@login_required
 def get_recent_activity():
     """Get recent bot activity logs"""
     try:
@@ -2476,6 +2481,7 @@ def get_recent_activity():
         }), 500
 
 @app.route('/api/database/stats', methods=['GET'])
+@login_required
 def get_database_stats():
     """Get database file size and record count"""
     try:
