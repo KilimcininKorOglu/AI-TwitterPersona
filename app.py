@@ -568,8 +568,6 @@ def api_status():
 @login_required
 def api_control():
     """Start/stop bot control"""
-    global bot_thread, bot_running
-    
     # Check if bot modules are loaded
     if not API_MODULES_LOADED:
         return jsonify({"success": False, "message": "Bot modülleri yüklenmedi - API anahtarlarını kontrol edin"}), 400
@@ -585,51 +583,58 @@ def api_control():
     if not action or action not in ['start', 'stop']:
         return jsonify({"success": False, "message": "Geçersiz action: 'start' veya 'stop' olmalı"}), 400
     
-    global bot_stop_event
     with bot_lock:
         if action == 'start' and not bot_running:
-            try:
-                # Give each run its own stop event: a previous thread that is still
-                # blocked in a network call keeps its set event and exits afterwards
-                bot_stop_event = threading.Event()
-
-                print("[INFO] Starting bot thread...")
-                bot_thread = threading.Thread(target=run_bot_thread, args=(bot_stop_event,))
-                bot_thread.daemon = True
-                bot_thread.start()
-                bot_running = True
-                bot_stats["bot_start_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                print(f"[SUCCESS] Bot started successfully, bot_running={bot_running}")
-
-                # Broadcast status update via SocketIO
-                socketio.emit('bot_status', {'running': True, 'message': 'Bot başlatıldı'})
-
-                return jsonify({"success": True, "message": "Bot başlatıldı"})
-            except Exception as e:
-                print(f"[!] Error starting bot thread: {e}")
-                return jsonify({"success": False, "message": f"Bot başlatılamadı: {str(e)}"})
-            
-        elif action == 'stop' and bot_running:
-            try:
-                print("[INFO] Stopping bot thread...")
-                bot_running = False
-                # Signal the thread; it exits at its next stop-event check. The event
-                # stays set so a thread blocked in a long call still stops afterwards.
-                bot_stop_event.set()
-
-                # Clear bot start time when stopped
-                bot_stats["bot_start_time"] = None
-
-                print(f"[SUCCESS] Bot stopped successfully, bot_running={bot_running}")
-
-                # Broadcast status update via SocketIO
-                socketio.emit('bot_status', {'running': False, 'message': 'Bot durduruldu'})
-
-                return jsonify({"success": True, "message": "Bot durduruldu"})
-            except Exception as e:
-                return jsonify({"success": False, "message": f"Bot durdurma hatası: {str(e)}"})
-            
+            return start_bot_locked()
+        if action == 'stop' and bot_running:
+            return stop_bot_locked()
         return jsonify({"success": False, "message": "Geçersiz işlem"})
+
+def start_bot_locked():
+    """Start a new bot thread; the caller holds bot_lock."""
+    global bot_thread, bot_running, bot_stop_event
+    try:
+        # Give each run its own stop event: a previous thread that is still
+        # blocked in a network call keeps its set event and exits afterwards
+        bot_stop_event = threading.Event()
+
+        print("[INFO] Starting bot thread...")
+        bot_thread = threading.Thread(target=run_bot_thread, args=(bot_stop_event,))
+        bot_thread.daemon = True
+        bot_thread.start()
+        bot_running = True
+        bot_stats["bot_start_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"[SUCCESS] Bot started successfully, bot_running={bot_running}")
+
+        # Broadcast status update via SocketIO
+        socketio.emit('bot_status', {'running': True, 'message': 'Bot başlatıldı'})
+
+        return jsonify({"success": True, "message": "Bot başlatıldı"})
+    except Exception as e:
+        print(f"[!] Error starting bot thread: {e}")
+        return jsonify({"success": False, "message": f"Bot başlatılamadı: {str(e)}"})
+
+def stop_bot_locked():
+    """Signal the running bot thread to stop; the caller holds bot_lock."""
+    global bot_running
+    try:
+        print("[INFO] Stopping bot thread...")
+        bot_running = False
+        # Signal the thread; it exits at its next stop-event check. The event
+        # stays set so a thread blocked in a long call still stops afterwards.
+        bot_stop_event.set()
+
+        # Clear bot start time when stopped
+        bot_stats["bot_start_time"] = None
+
+        print(f"[SUCCESS] Bot stopped successfully, bot_running={bot_running}")
+
+        # Broadcast status update via SocketIO
+        socketio.emit('bot_status', {'running': False, 'message': 'Bot durduruldu'})
+
+        return jsonify({"success": True, "message": "Bot durduruldu"})
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Bot durdurma hatası: {str(e)}"})
 
 PERSONA_TYPES = ('tech', 'casual', 'sad')  # Persona prompt types stored with tweets
 
