@@ -13,6 +13,7 @@ from config import get_config, get_int_config, get_bool_config, reload_config, g
 import sqlite3
 from datetime import datetime, timedelta, timezone
 import json
+import math
 from functools import lru_cache
 import gc  # For memory management
 import logging
@@ -1506,8 +1507,11 @@ def validate_config_value(key, value):
             if isinstance(value, str) and not value.strip():
                 return False, "", f"{rule['description']} cannot be empty"
             sanitized = float(value)
-            
-            # Range validation  
+            # NaN fails every comparison below, so reject non-finite values explicitly
+            if not math.isfinite(sanitized):
+                return False, "", f"{rule['description']} must be a finite number"
+
+            # Range validation
             if 'min' in rule and sanitized < rule['min']:
                 return False, "", f"{rule['description']} must be >= {rule['min']}"
             if 'max' in rule and sanitized > rule['max']:

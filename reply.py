@@ -2,6 +2,7 @@ from config import get_config, get_float_config, get_int_config  # Centralized c
 import os                          # For environment variable access
 import logging  # For secure logging
 import json                        # For cache file operations
+import math                        # For finite float checks
 import time                        # For quota backoff sleeps
 import requests                    # For network exception types
 import google.generativeai as genai    # Google Gemini AI API
@@ -16,6 +17,9 @@ def safe_float_config(key, default_value, min_val=None, max_val=None):
     """Safely parse float configuration with validation and error handling"""
     try:
         value = get_float_config(key, default_value)
+        if not math.isfinite(value):
+            print(f"[WARNING] {key}={value} is not a finite number, using default {default_value}")
+            return default_value
         if min_val is not None and value < min_val:
             print(f"[WARNING] {key}={value} is below minimum {min_val}, using {min_val}")
             return min_val
