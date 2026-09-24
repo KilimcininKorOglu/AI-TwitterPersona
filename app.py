@@ -367,7 +367,7 @@ def add_security_headers(response):
     return response
 
 # Initialize SocketIO for real-time updates
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app)  # Default CORS policy only accepts same-origin connections
 
 # Global bot control variables with thread safety
 bot_thread = None
@@ -880,7 +880,7 @@ def api_config():
             # Broadcast configuration change to all clients
             socketio.emit('config_updated', {
                 'message': 'Konfigürasyon güncellendi ve otomatik olarak uygulandı!',
-                'config': new_config,
+                'updated_keys': list(new_config.keys()),
                 'auto_applied': True
             })
             
@@ -1346,6 +1346,9 @@ def run_bot_thread():
 def handle_connect():
     """Handle client connection"""
     from flask import request
+    # Reject unauthenticated sockets; broadcasts carry tweets and console logs
+    if not current_user.is_authenticated:
+        return False
     client_id = request.sid
     connected_clients.add(client_id)
     print(f'[+] Client {client_id} connected to real-time updates (Total: {len(connected_clients)})')
