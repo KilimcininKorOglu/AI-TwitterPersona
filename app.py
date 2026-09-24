@@ -523,6 +523,7 @@ def prompts():
 
 # API Endpoints
 @app.route('/api/status')
+@login_required
 def api_status():
     """Get bot current status"""
     update_stats()
@@ -532,6 +533,7 @@ def api_status():
     })
 
 @app.route('/api/control', methods=['POST'])
+@login_required
 def api_control():
     """Start/stop bot control"""
     global bot_thread, bot_running
@@ -708,12 +710,14 @@ def api_enhance_tweet():
         })
 
 @app.route('/api/trends')
+@login_required
 def api_trends():
     """Get current trending topics"""
     trends = get_current_trends()
     return jsonify({"trends": trends})
 
 @app.route('/api/retry_tweet/<int:tweet_id>', methods=['POST'])
+@login_required
 def api_retry_tweet(tweet_id):
     """Retry failed tweet by ID"""
     try:
@@ -756,6 +760,7 @@ def api_retry_tweet(tweet_id):
         return jsonify({"success": False, "message": f"Hata: {str(e)}"})
 
 @app.route('/api/bulk_retry', methods=['POST'])
+@login_required
 def api_bulk_retry():
     """Retry all failed tweets"""
     try:
@@ -800,6 +805,7 @@ def api_bulk_retry():
         return jsonify({"success": False, "message": f"Hata: {str(e)}"})
 
 @app.route('/api/delete_tweet/<int:tweet_id>', methods=['DELETE'])
+@login_required
 def api_delete_tweet(tweet_id):
     """Delete tweet from database"""
     try:
@@ -904,6 +910,7 @@ def api_config():
             }), 500
 
 @app.route('/api/emergency_stop', methods=['POST'])
+@login_required
 def api_emergency_stop():
     """Emergency stop - kill all bot processes immediately"""
     global bot_running, bot_thread
@@ -930,6 +937,7 @@ def api_emergency_stop():
         return jsonify({"success": False, "message": f"Acil durdurma hatası: {str(e)}"})
 
 @app.route('/api/clear_database', methods=['POST'])
+@login_required
 def api_clear_database():
     """Clear all tweets from database"""
     try:
@@ -963,6 +971,7 @@ def api_clear_database():
         return jsonify({"success": False, "message": f"Veritabanı temizlenemedi: {str(e)}"})
 
 @app.route('/api/force_tweet', methods=['POST'])
+@login_required
 def api_force_tweet():
     """Force immediate tweet generation and posting"""
     try:
