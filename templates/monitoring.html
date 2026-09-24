@@ -318,15 +318,7 @@
         };
         
         const consoleOutput = document.getElementById('console-output');
-        const newLine = document.createElement('div');
-        newLine.className = 'console-line';
-        newLine.innerHTML = `
-            <span class="text-success">[${timestamp}]</span> 
-            <span class="${typeColors[type]}">[${type}]</span> 
-            ${message}
-        `;
-        
-        consoleOutput.appendChild(newLine);
+        consoleOutput.appendChild(buildConsoleLine(type, message, timestamp, typeColors));
         
         // Auto-scroll if enabled
         if (document.getElementById('auto-scroll').checked) {

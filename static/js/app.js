@@ -213,15 +213,16 @@ function createToastElement(message, type) {
                 <small class="text-muted">şimdi</small>
                 <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
             </div>
-            <div class="toast-body">
-                ${message}
-            </div>
+            <div class="toast-body"></div>
         </div>
     `;
-    
+
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = toastHTML;
-    return tempDiv.firstElementChild;
+    const toast = tempDiv.firstElementChild;
+    // Messages carry tweet text and server errors, so never parse them as HTML
+    toast.querySelector('.toast-body').textContent = message;
+    return toast;
 }
 
 // Form utilities
@@ -433,6 +434,23 @@ function formatTimeAgo(dateString) {
     return Math.floor(diffInSeconds / 86400) + ' gün önce';
 }
 
+// Build a console line with textContent: messages include AI output and scraped topics
+function buildConsoleLine(type, message, timestamp, typeColors) {
+    const newLine = document.createElement('div');
+    newLine.className = 'console-line';
+
+    const time = document.createElement('span');
+    time.className = 'text-success';
+    time.textContent = `[${timestamp}]`;
+
+    const label = document.createElement('span');
+    label.className = typeColors[type] || '';
+    label.textContent = `[${type}]`;
+
+    newLine.append(time, ' ', label, ' ', String(message));
+    return newLine;
+}
+
 // Real-time console log for monitoring page
 function addConsoleLogRealTime(type, message, timestamp) {
     const consoleOutput = document.getElementById('console-output');
@@ -445,16 +463,8 @@ function addConsoleLogRealTime(type, message, timestamp) {
         'SUCCESS': 'text-success'
     };
     
-    const newLine = document.createElement('div');
-    newLine.className = 'console-line';
-    newLine.innerHTML = `
-        <span class="text-success">[${timestamp}]</span> 
-        <span class="${typeColors[type]}">[${type}]</span> 
-        ${message}
-    `;
-    
-    consoleOutput.appendChild(newLine);
-    
+    consoleOutput.appendChild(buildConsoleLine(type, message, timestamp, typeColors));
+
     // Auto-scroll if enabled
     const autoScroll = document.getElementById('auto-scroll');
     if (autoScroll && autoScroll.checked) {
