@@ -72,8 +72,10 @@ class ConfigManager:
     
     def get_bool(self, key, default=False):
         """Get boolean configuration value"""
-        value = self.get(key, '').lower()
-        return value in ('true', '1', 'yes', 'on')
+        value = self.get(key)
+        if value is None or not value.strip():
+            return default
+        return value.strip().lower() in ('true', '1', 'yes', 'on')
     
     def get_list(self, key, default=None, separator=','):
         """Get list configuration value by splitting string"""
