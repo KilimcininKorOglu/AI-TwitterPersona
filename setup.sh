@@ -59,10 +59,10 @@ if [[ "$1" == "production" ]]; then
     # Install production dependencies
     pip install gunicorn supervisor
     
-    # Copy production environment template
+    # Copy environment template (.env.example is the only template in the repository)
     if [ ! -f "token.env" ]; then
-        cp .env.production token.env
-        echo "[INFO] Created token.env from production template"
+        cp .env.example token.env
+        echo "[INFO] Created token.env from example template"
         echo "[IMPORTANT] Please edit token.env with your production API keys!"
     fi
     
