@@ -166,10 +166,10 @@ endblock %} {% block content %}
 
     charCount.textContent = `${length}/280`;
 
-    if (length > 250) {
-      charCount.className = "text-warning";
-    } else if (length > 270) {
+    if (length > 270) {
       charCount.className = "text-danger";
+    } else if (length > 250) {
+      charCount.className = "text-warning";
     } else {
       charCount.className = "text-muted";
     }
