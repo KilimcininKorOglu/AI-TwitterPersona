@@ -258,20 +258,28 @@ function displayPersonaSettings(settings) {
     settings.forEach(setting => {
         const col = document.createElement('div');
         col.className = 'col-md-6 mb-3';
-        
-        col.innerHTML = `
-            <label for="setting-${setting.setting_key}" class="form-label">
-                <strong>${setting.display_name}</strong>
-            </label>
-            <input type="text" 
-                   class="form-control persona-setting" 
-                   id="setting-${setting.setting_key}" 
-                   data-key="${setting.setting_key}"
-                   value="${setting.setting_value}" 
-                   placeholder="${setting.description}">
-            <div class="form-text">${setting.description}</div>
-        `;
-        
+
+        // Set values through DOM properties so quotes in stored values cannot break out of attributes
+        const label = document.createElement('label');
+        label.className = 'form-label';
+        label.htmlFor = `setting-${setting.setting_key}`;
+        const strong = document.createElement('strong');
+        strong.textContent = setting.display_name;
+        label.appendChild(strong);
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'form-control persona-setting';
+        input.id = `setting-${setting.setting_key}`;
+        input.dataset.key = setting.setting_key;
+        input.value = setting.setting_value;
+        input.placeholder = setting.description;
+
+        const help = document.createElement('div');
+        help.className = 'form-text';
+        help.textContent = setting.description;
+
+        col.append(label, input, help);
         container.appendChild(col);
     });
 }
@@ -396,18 +404,23 @@ async function previewPersona() {
         // Format prompt with current settings
         let formattedPrompt = promptText;
         Object.keys(settings).forEach(key => {
-            const placeholder = `{${key}}`;
-            formattedPrompt = formattedPrompt.replace(new RegExp(placeholder, 'g'), settings[key]);
+            formattedPrompt = formattedPrompt.split(`{${key}}`).join(settings[key]);
         });
-        
-        // Show preview
-        document.getElementById('preview-content').innerHTML = `
-            <h6>Persona: ${settings.persona_name || 'Varsayılan'}</h6>
-            <p><strong>Yaş:</strong> ${settings.persona_age}, <strong>Konum:</strong> ${settings.persona_location}</p>
+
+        // Show preview; user-provided values are inserted with textContent only
+        const preview = document.getElementById('preview-content');
+        preview.innerHTML = `
+            <h6>Persona: <span data-field="name"></span></h6>
+            <p><strong>Yaş:</strong> <span data-field="age"></span>, <strong>Konum:</strong> <span data-field="location"></span></p>
             <hr>
-            <h6>Formatlanmış Prompt (${activeTab}):</h6>
-            <pre style="white-space: pre-wrap; font-family: inherit;">${formattedPrompt}</pre>
+            <h6>Formatlanmış Prompt (<span data-field="tab"></span>):</h6>
+            <pre style="white-space: pre-wrap; font-family: inherit;" data-field="prompt"></pre>
         `;
+        preview.querySelector('[data-field="name"]').textContent = settings.persona_name || 'Varsayılan';
+        preview.querySelector('[data-field="age"]').textContent = settings.persona_age;
+        preview.querySelector('[data-field="location"]').textContent = settings.persona_location;
+        preview.querySelector('[data-field="tab"]').textContent = activeTab;
+        preview.querySelector('[data-field="prompt"]').textContent = formattedPrompt;
         
         new bootstrap.Modal(document.getElementById('previewModal')).show();
         
@@ -450,10 +463,9 @@ function showNotification(message, type) {
     alertDiv.style.top = '20px';
     alertDiv.style.right = '20px';
     alertDiv.style.zIndex = '9999';
-    alertDiv.innerHTML = `
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    `;
+    alertDiv.innerHTML = '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+    // Messages can include server error text, so insert them as text
+    alertDiv.prepend(document.createTextNode(message));
     
     document.body.appendChild(alertDiv);
     

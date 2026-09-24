@@ -2664,12 +2664,16 @@ def sanitize_input(text):
     if not text:
         return ""
     
-    # Remove HTML tags and scripts
+    # Remove HTML tags and scripts; repeat until stable so nested payloads
+    # such as "jajavascript:vascript:" cannot reassemble after one pass
     import re
-    text = re.sub(r'<[^>]*>', '', text)
-    text = re.sub(r'javascript:', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'data:', '', text, flags=re.IGNORECASE)
-    
+    previous = None
+    while previous != text:
+        previous = text
+        text = re.sub(r'<[^>]*>', '', text)
+        text = re.sub(r'javascript:', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'data:', '', text, flags=re.IGNORECASE)
+
     return text.strip()
 
 if __name__ == '__main__':
