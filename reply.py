@@ -7,6 +7,7 @@ import requests                    # For network exception types
 import google.generativeai as genai    # Google Gemini AI API
 import google.api_core.exceptions      # For specific Gemini API error handling
 import database                    # For database operations (avoid runtime import)
+from tweet_length import fits_in_tweet, tweet_length, TWEET_MAX_LENGTH
 
 # Configuration loaded via centralized config module
 
@@ -368,6 +369,11 @@ Hashtag: {hashtag}"""
         # Return cleaned response text
         text = resp.text.strip()
         rate_limiter.record_success()
+
+        # Twitter rejects over-long tweets; skip so the caller retries with a new generation
+        if not fits_in_tweet(text):
+            print(f"[!] Generated tweet is {tweet_length(text)} characters (limit {TWEET_MAX_LENGTH}), skipping")
+            return ""
         return text
         
     except google.api_core.exceptions.ResourceExhausted as e:
