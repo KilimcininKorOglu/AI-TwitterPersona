@@ -134,53 +134,53 @@ def validate_secret_key_strength(key):
     Returns: (is_strong: bool, issues: list, score: int)
     """
     issues = []
-    score = 0
-    
-    # Length check
+    score = sum(check(key, issues) for check in SECRET_KEY_CHECKS)
+
+    # Classification
+    is_strong = len(issues) == 0 and score >= 5
+
+    return is_strong, issues, max(0, score)
+
+def score_secret_length(key, issues):
+    """Length check: +2 from 32 characters, +1 more from 64."""
+    score = 1 if len(key) >= 64 else 0
     if len(key) < 32:
         issues.append("Secret key should be at least 32 characters long")
-    else:
-        score += 2
-    
-    if len(key) >= 64:
-        score += 1
-        
-    # Character variety check
+        return score
+    return score + 2
+
+def score_secret_variety(key, issues):
+    """Character variety check: +1 per character type when at least two types are used."""
     has_upper = any(c.isupper() for c in key)
     has_lower = any(c.islower() for c in key)
     has_digit = any(c.isdigit() for c in key)
     has_special = any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in key)
-    
     variety_count = sum([has_upper, has_lower, has_digit, has_special])
-    
     if variety_count < 2:
         issues.append("Secret key should contain different character types (upper, lower, digits, special)")
-    else:
-        score += variety_count
-    
-    # Common/weak patterns check
-    weak_patterns = [
-        "secret", "password", "key", "twitter", "bot", "flask",
-        "123456", "abcdef", "qwerty", "admin", "test", "default"
-    ]
-    
+        return 0
+    return variety_count
+
+WEAK_SECRET_PATTERNS = [
+    "secret", "password", "key", "twitter", "bot", "flask",
+    "123456", "abcdef", "qwerty", "admin", "test", "default"
+]
+
+def score_secret_weak_patterns(key, issues):
+    """Common/weak patterns check: -1 per pattern found."""
     key_lower = key.lower()
-    for pattern in weak_patterns:
-        if pattern in key_lower:
-            issues.append(f"Secret key contains weak pattern: '{pattern}'")
-            score -= 1
-    
-    # Entropy check (simplified)
-    unique_chars = len(set(key))
-    if unique_chars < len(key) * 0.5:  # Less than 50% unique characters
+    found = [pattern for pattern in WEAK_SECRET_PATTERNS if pattern in key_lower]
+    issues.extend(f"Secret key contains weak pattern: '{pattern}'" for pattern in found)
+    return -len(found)
+
+def score_secret_entropy(key, issues):
+    """Entropy check (simplified): +1 when at least 50% of the characters are unique."""
+    if len(set(key)) < len(key) * 0.5:
         issues.append("Secret key has low entropy (too many repeated characters)")
-    else:
-        score += 1
-    
-    # Classification
-    is_strong = len(issues) == 0 and score >= 5
-    
-    return is_strong, issues, max(0, score)
+        return 0
+    return 1
+
+SECRET_KEY_CHECKS = (score_secret_length, score_secret_variety, score_secret_weak_patterns, score_secret_entropy)
 
 def generate_secure_secret_key():
     """Generate a cryptographically secure secret key"""
