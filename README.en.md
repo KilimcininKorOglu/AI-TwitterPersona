@@ -251,12 +251,9 @@ gunicorn --config gunicorn.conf.py app:app --workers=1
 
 ### Systemd Service
 
-```bash
-# Bot service
-sudo cp twitter-bot.service /etc/systemd/system/
-sudo systemctl enable twitter-bot
-sudo systemctl start twitter-bot
+The bot is started and stopped from the dashboard. Do not run `main.py` as a separate service; two bots would post at the same time.
 
+```bash
 # Dashboard service
 sudo cp twitter-dashboard.service /etc/systemd/system/
 sudo systemctl enable twitter-dashboard

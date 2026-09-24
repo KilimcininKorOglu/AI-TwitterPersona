@@ -72,14 +72,14 @@ if [[ "$1" == "production" ]]; then
         sudo useradd --create-home --shell /bin/bash twitterbot
     fi
     
-    # Set up systemd services
-    echo "[INFO] Installing systemd services..."
-    sudo cp twitter-bot.service /etc/systemd/system/
+    # Set up systemd service (the bot runs inside the dashboard; a separate
+    # main.py service would post tweets twice)
+    echo "[INFO] Installing systemd service..."
     sudo cp twitter-dashboard.service /etc/systemd/system/
     sudo systemctl daemon-reload
-    
+
     echo "[INFO] Production setup complete!"
-    echo "To start services: sudo systemctl enable --now twitter-bot twitter-dashboard"
+    echo "To start the service: sudo systemctl enable --now twitter-dashboard"
     
 else
     echo "[INFO] Setting up for DEVELOPMENT environment"
@@ -108,7 +108,7 @@ echo
 echo "Next steps:"
 echo "1. Edit token.env with your API keys"
 if [[ "$1" == "production" ]]; then
-    echo "2. sudo systemctl start twitter-bot twitter-dashboard"
+    echo "2. sudo systemctl start twitter-dashboard (start the bot from the dashboard)"
     echo "3. Check status: sudo systemctl status twitter-dashboard"
 else
     echo "2. Run: python main.py (for CLI bot)"
