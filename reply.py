@@ -3,6 +3,7 @@ import os                          # For environment variable access
 import logging  # For secure logging
 import json                        # For cache file operations
 import math                        # For finite float checks
+import re                          # For hashtag extraction
 import time                        # For quota backoff sleeps
 import requests                    # For network exception types
 import google.generativeai as genai    # Google Gemini AI API
@@ -92,6 +93,40 @@ class QuotaBackoff:
         self.consecutive_failures = 0
 
 rate_limiter = QuotaBackoff()
+
+# Log labels for Gemini call failures, checked in order with isinstance
+GEMINI_ERROR_LABELS = (
+    (google.api_core.exceptions.InvalidArgument, "Gemini API invalid argument (API key or request)"),
+    (google.api_core.exceptions.PermissionDenied, "Gemini API permission denied"),
+    (google.api_core.exceptions.NotFound, "Gemini model not found"),
+    (google.api_core.exceptions.DeadlineExceeded, "Gemini API timeout"),
+    (google.api_core.exceptions.ServiceUnavailable, "Gemini service unavailable"),
+    (google.api_core.exceptions.InternalServerError, "Gemini internal server error"),
+    (requests.exceptions.ConnectionError, "Network connection error"),
+    (requests.exceptions.Timeout, "Request timeout"),
+    (json.JSONDecodeError, "JSON decode error in API response"),
+)
+
+def log_gemini_error(action, error):
+    """Log a failed Gemini call with a label for its error type."""
+    label = next((text for error_type, text in GEMINI_ERROR_LABELS if isinstance(error, error_type)),
+                 "Unexpected error")
+    logging.error(f"{label} during {action}: {type(error).__name__}: {error}")
+
+def wait_for_quota(error, action, base_seconds, max_seconds):
+    """Record a quota failure and sleep with exponential backoff."""
+    rate_limiter.record_failure()
+    print(f"[!] Gemini API quota exceeded during {action}: {error}")
+    backoff_time = min(2 ** rate_limiter.consecutive_failures * base_seconds, max_seconds)
+    print(f"[!] Waiting {backoff_time//60} minutes for quota reset (failure #{rate_limiter.consecutive_failures})")
+    time.sleep(backoff_time)
+
+HASHTAG_PATTERN = re.compile(r'#[\wÀ-ɏḀ-ỿ]+')
+
+def extract_hashtag(text):
+    """Return the first hashtag in text, or None."""
+    match = HASHTAG_PATTERN.search(text)
+    return match.group(0) if match else None
 
 # Global variables for lazy initialization
 model = None
@@ -351,14 +386,11 @@ def generate_text_for_persona(user_input, persona):
 
     # Start a new conversation with Gemini AI
     convo = model.start_chat(history=[])
-    
-    # Extract hashtag if present for better context
-    import re
-    hashtag_pattern = r'#[\w\u00C0-\u024F\u1E00-\u1EFF]+'
-    hashtag_match = re.search(hashtag_pattern, user_input)
 
-    if hashtag_match:
-        hashtag = hashtag_match.group(0)
+    # Extract hashtag if present for better context
+    hashtag = extract_hashtag(user_input)
+
+    if hashtag:
         # Create context-aware prompt
         context_prompt = f"""{persona}
 
@@ -400,58 +432,13 @@ Hashtag: {hashtag}"""
             print(f"[!] Generated tweet is {tweet_length(text)} characters (limit {TWEET_MAX_LENGTH}), skipping")
             return ""
         return text
-        
+
     except google.api_core.exceptions.ResourceExhausted as e:
-        # Handle API quota exceeded errors with dynamic backoff
-        rate_limiter.record_failure()
-        print(f"[!] Gemini API quota exceeded during tweet generation: {e}")
-        
-        # Dynamic backoff based on failure count
-        backoff_time = min(2 ** rate_limiter.consecutive_failures * 300, 3600)  # Max 1 hour
-        print(f"[!] Pausing bot for {backoff_time//60} minutes (failure #{rate_limiter.consecutive_failures})")
-        
-        time.sleep(backoff_time)
+        # Handle API quota exceeded errors with dynamic backoff (max 1 hour)
+        wait_for_quota(e, "tweet generation", base_seconds=300, max_seconds=3600)
         return ""  # Return empty string to indicate failure
-        
-    except google.api_core.exceptions.InvalidArgument as e:
-        # Handle invalid arguments or API key errors
-        logging.error(f"Gemini API invalid argument error: {str(e)}")
-        return ""
-    except google.api_core.exceptions.PermissionDenied as e:
-        # Handle permission denied errors
-        logging.error(f"Gemini API permission denied: {str(e)}")
-        return ""
-    except google.api_core.exceptions.NotFound as e:
-        # Handle model not found errors
-        logging.error(f"Gemini model not found: {str(e)}")
-        return ""
-    except google.api_core.exceptions.DeadlineExceeded as e:
-        # Handle timeout errors
-        logging.error(f"Gemini API timeout during generation: {str(e)}")
-        return ""
-    except google.api_core.exceptions.ServiceUnavailable as e:
-        # Handle service unavailable errors
-        logging.error(f"Gemini service unavailable during generation: {str(e)}")
-        return ""
-    except google.api_core.exceptions.InternalServerError as e:
-        # Handle internal server errors
-        logging.error(f"Gemini internal server error: {str(e)}")
-        return ""
-    except requests.exceptions.ConnectionError as e:
-        # Handle network connection errors
-        logging.error(f"Network connection error during generation: {str(e)}")
-        return ""
-    except requests.exceptions.Timeout as e:
-        # Handle request timeout errors
-        logging.error(f"Request timeout during generation: {str(e)}")
-        return ""
-    except json.JSONDecodeError as e:
-        # Handle JSON parsing errors in API response
-        logging.error(f"JSON decode error in generation response: {str(e)}")
-        return ""
     except Exception as e:
-        # Handle any other unexpected errors with full error details
-        logging.error(f"Unexpected tweet generation error: {type(e).__name__}: {str(e)}")
+        log_gemini_error("tweet generation", e)
         return ""
 
 def save_cache():
