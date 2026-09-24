@@ -399,7 +399,16 @@
                 user_id: document.getElementById('user-id').value,
                 gemini_api_key: document.getElementById('gemini-api-key').value
             };
-            
+
+            // An empty credential field means "not set / unchanged"; sending it would fail
+            // validation and reject the whole save, including unrelated settings
+            ['api_key', 'api_secret', 'access_token', 'access_token_secret', 'bearer_token', 'user_id', 'gemini_api_key']
+                .forEach(key => {
+                    if (!config[key] || !config[key].trim()) {
+                        delete config[key];
+                    }
+                });
+
             // Debug: Log all values to see which one is undefined
             console.log('Config data before send:', config);
             Object.keys(config).forEach(key => {
