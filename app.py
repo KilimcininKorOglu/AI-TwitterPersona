@@ -2281,6 +2281,28 @@ def api_toggle_prompt(prompt_type):
             'message': f'Toggle error: {str(e)}'
         }), 500
 
+@app.route('/api/prompts/<prompt_type>/active', methods=['PUT'])
+@login_required
+def api_set_prompt_active(prompt_type):
+    """Set prompt active status to an explicit value"""
+    data = request.get_json(silent=True) or {}
+    is_active = data.get('active')
+    if not isinstance(is_active, bool):
+        return jsonify({
+            'success': False,
+            'message': "'active' alanı true veya false olmalı"
+        }), 400
+
+    if database.set_prompt_active(prompt_type, is_active):
+        return jsonify({
+            'success': True,
+            'message': f'{prompt_type} prompt durumu güncellendi'
+        })
+    return jsonify({
+        'success': False,
+        'message': 'Prompt durumu güncellenemedi'
+    }), 404
+
 @app.route('/api/persona-settings', methods=['GET'])
 @login_required
 def api_get_persona_settings():

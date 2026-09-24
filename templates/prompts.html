@@ -367,16 +367,16 @@ async function saveAllPrompts() {
                 });
                 promises.push(promise);
                 
-                // Handle active status separately if needed
-                if (!isActive) {
-                    const togglePromise = fetch(`/api/prompts/${type}/toggle`, {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRFToken': getCSRFToken()
-                        }
-                    });
-                    promises.push(togglePromise);
-                }
+                // Send the checkbox state itself; a toggle would flip an already inactive prompt back on
+                const activePromise = fetch(`/api/prompts/${type}/active`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken()
+                    },
+                    body: JSON.stringify({ active: isActive })
+                });
+                promises.push(activePromise);
             }
         });
         

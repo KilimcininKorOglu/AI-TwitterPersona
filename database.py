@@ -460,6 +460,43 @@ def toggle_prompt_status(prompt_type):
         if 'db' in locals() and db:
             db.close()
 
+def set_prompt_active(prompt_type, is_active):
+    """
+    Set the active status of a prompt to an explicit value.
+
+    Args:
+        prompt_type (str): The type of prompt to update
+        is_active (bool): Desired active status
+
+    Returns:
+        bool: True if the prompt exists and was updated, False otherwise
+    """
+    try:
+        db = get_db_connection()
+        if db is None:
+            return False
+
+        cursor = db.cursor()
+        cursor.execute("""UPDATE prompts
+                        SET is_active = ?, updated_at = CURRENT_TIMESTAMP
+                        WHERE prompt_type = ?""", (1 if is_active else 0, prompt_type))
+
+        if cursor.rowcount == 0:
+            print(f"[-] Prompt '{prompt_type}' not found")
+            return False
+        db.commit()
+        print(f"[+] Prompt '{prompt_type}' active status set to {bool(is_active)}")
+        return True
+
+    except Exception as e:
+        print(f"[-] Error setting prompt status {prompt_type}: {e}")
+        return False
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'db' in locals() and db:
+            db.close()
+
 def get_active_prompts_dict():
     """
     Get all active prompts as a dictionary for use in AI generation.
