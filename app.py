@@ -765,48 +765,55 @@ def api_retry_tweet(tweet_id):
     except Exception as e:
         return jsonify({"success": False, "message": f"Hata: {str(e)}"})
 
+def mark_tweet_sent(safe_table, tweet_id):
+    """Set sent = 1 for one tweet in its own short transaction."""
+    conn = database.get_db_connection()
+    if not conn:
+        raise RuntimeError("Veritabanı bağlantı hatası")
+    try:
+        with conn:  # Commits on success
+            conn.execute(f"UPDATE {safe_table} SET sent = 1 WHERE id = ?", (tweet_id,))
+    finally:
+        conn.close()
+
 @app.route('/api/bulk_retry', methods=['POST'])
 @login_required
 def api_bulk_retry():
     """Retry all failed tweets"""
     try:
+        # Get all failed tweets with validated table name
+        safe_table = get_safe_table_name()
+        if not safe_table:
+            return jsonify({"success": False, "message": "Güvenlik hatası: Geçersiz tablo adı"})
+
         conn = database.get_db_connection()
-        if conn:
-            cursor = conn.cursor()
-            
-            # Get all failed tweets with validated table name
-            safe_table = get_safe_table_name()
-            if not safe_table:
-                return jsonify({"success": False, "message": "Güvenlik hatası: Geçersiz tablo adı"})
-                
-            cursor.execute(f"SELECT id, tweet_text FROM {safe_table} WHERE sent = 0")
-            failed_tweets = cursor.fetchall()
-            
-            if not failed_tweets:
-                return jsonify({"success": False, "message": "Tekrar gönderilecek başarısız tweet bulunamadı"})
-            
-            success_count = 0
-            for tweet_id, tweet_text in failed_tweets:
-                # Try to post each failed tweet
-                status = main.scheduled_tweet(tweet_text)
-                
-                if status:
-                    # Update database
-                    cursor.execute(f"UPDATE {safe_table} SET sent = 1 WHERE id = ?", (tweet_id,))
-                    success_count += 1
-                
-                # Small delay between tweets to avoid rate limiting
-                time.sleep(2)
-            
-            conn.commit()
-            cursor.close()
-            conn.close()
-            
-            return jsonify({
-                "success": True, 
-                "message": f"{success_count}/{len(failed_tweets)} tweet başarıyla gönderildi"
-            })
-            
+        if not conn:
+            return jsonify({"success": False, "message": "Veritabanı bağlantı hatası"})
+        try:
+            failed_tweets = conn.execute(f"SELECT id, tweet_text FROM {safe_table} WHERE sent = 0").fetchall()
+        finally:
+            conn.close()  # Do not hold a connection while posting
+
+        if not failed_tweets:
+            return jsonify({"success": False, "message": "Tekrar gönderilecek başarısız tweet bulunamadı"})
+
+        success_count = 0
+        for tweet_id, tweet_text in failed_tweets:
+            # Try to post each failed tweet
+            if main.scheduled_tweet(tweet_text):
+                # Mark it sent right away in a short transaction, so a later failure
+                # cannot leave a posted tweet flagged for another retry
+                mark_tweet_sent(safe_table, tweet_id)
+                success_count += 1
+
+            # Small delay between tweets to avoid rate limiting
+            time.sleep(2)
+
+        return jsonify({
+            "success": True,
+            "message": f"{success_count}/{len(failed_tweets)} tweet başarıyla gönderildi"
+        })
+
     except Exception as e:
         return jsonify({"success": False, "message": f"Hata: {str(e)}"})
 
@@ -815,30 +822,24 @@ def api_bulk_retry():
 def api_delete_tweet(tweet_id):
     """Delete tweet from database"""
     try:
+        # Delete tweet from database with validated table name
+        safe_table = get_safe_table_name()
+        if not safe_table:
+            return jsonify({"success": False, "message": "Güvenlik hatası: Geçersiz tablo adı"})
+
         conn = database.get_db_connection()
-        if conn:
-            cursor = conn.cursor()
-            
-            # Delete tweet from database with validated table name
-            safe_table = get_safe_table_name()
-            if not safe_table:
-                return jsonify({"success": False, "message": "Güvenlik hatası: Geçersiz tablo adı"})
-                
-            cursor.execute(f"DELETE FROM {safe_table} WHERE id = ?", (tweet_id,))
-            
-            if cursor.rowcount > 0:
-                conn.commit()
-                message = "Tweet veritabanından silindi"
-                success = True
-            else:
-                message = "Tweet bulunamadı"
-                success = False
-            
-            cursor.close()
+        if not conn:
+            return jsonify({"success": False, "message": "Veritabanı bağlantı hatası"})
+        try:
+            with conn:  # Commits on success
+                deleted = conn.execute(f"DELETE FROM {safe_table} WHERE id = ?", (tweet_id,)).rowcount
+        finally:
             conn.close()
-            
-            return jsonify({"success": success, "message": message})
-            
+
+        if deleted > 0:
+            return jsonify({"success": True, "message": "Tweet veritabanından silindi"})
+        return jsonify({"success": False, "message": "Tweet bulunamadı"})
+
     except Exception as e:
         return jsonify({"success": False, "message": f"Hata: {str(e)}"})
 
@@ -946,32 +947,28 @@ def api_emergency_stop():
 def api_clear_database():
     """Clear all tweets from database"""
     try:
+        # Validate table name before touching the database
+        safe_table = get_safe_table_name()
+        if not safe_table:
+            return jsonify({"success": False, "message": "Güvenlik hatası: Geçersiz tablo adı"})
+
         conn = database.get_db_connection()
-        if conn:
-            cursor = conn.cursor()
-            
-            # Count existing records with validated table name
-            safe_table = get_safe_table_name()
-            if not safe_table:
-                return jsonify({"success": False, "message": "Güvenlik hatası: Geçersiz tablo adı"})
-                
-            cursor.execute(f"SELECT COUNT(*) FROM {safe_table}")
-            record_count = cursor.fetchone()[0]
-            
-            # Clear all tweets
-            cursor.execute(f"DELETE FROM {safe_table}")
-            conn.commit()
-            
-            cursor.close()
+        if not conn:
+            return jsonify({"success": False, "message": "Veritabanı bağlantı hatası"})
+        try:
+            with conn:  # Commits on success
+                # Clear all tweets; rowcount is the number of deleted records
+                record_count = conn.execute(f"DELETE FROM {safe_table}").rowcount
+        finally:
             conn.close()
-            
-            broadcast_console_log('WARN', f'Veritabanı temizlendi - {record_count} kayıt silindi')
-            
-            return jsonify({
-                "success": True, 
-                "message": f"Veritabanı temizlendi - {record_count} kayıt silindi"
-            })
-            
+
+        broadcast_console_log('WARN', f'Veritabanı temizlendi - {record_count} kayıt silindi')
+
+        return jsonify({
+            "success": True,
+            "message": f"Veritabanı temizlendi - {record_count} kayıt silindi"
+        })
+
     except Exception as e:
         return jsonify({"success": False, "message": f"Veritabanı temizlenemedi: {str(e)}"})
 
