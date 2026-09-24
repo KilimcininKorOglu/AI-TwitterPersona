@@ -85,26 +85,7 @@ def get_client():
         return None
 
     try:
-        # Initialize Tweepy client with all authentication methods
-        new_client = tweepy.Client(
-            consumer_key=credentials["api_key"],                    # API Key for app authentication
-            consumer_secret=credentials["api_secret"],              # API Secret for app authentication
-            access_token=credentials["access_token"],               # User access token
-            access_token_secret=credentials["access_token_secret"], # User access token secret
-            bearer_token=credentials["bearer_token"]                # Bearer token for API v2
-        )
-
-        # Test client connection with a simple API call
-        try:
-            me = new_client.get_me()
-            if me.data:
-                logging.info(f"Twitter client initialized successfully for user: @{me.data.username}")
-            else:
-                logging.warning("Twitter client created but user verification failed")
-        except Exception as test_error:
-            logging.warning(f"Twitter client created but connection test failed: {test_error}")
-
-        client = new_client
+        client = build_client(credentials)
         _client_credentials = credentials
         return client
 
