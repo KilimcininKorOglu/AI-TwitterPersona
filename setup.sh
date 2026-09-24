@@ -23,6 +23,15 @@ if ! command -v python3 &> /dev/null; then
     exit 1
 fi
 
+# Production services run from a fixed path; check it before building the venv there
+APP_DIR="/opt/ai-twitterpersona"
+if [[ "$1" == "production" && "$(pwd -P)" != "$APP_DIR" ]]; then
+    echo "[ERROR] Production setup must run from $APP_DIR (twitter-dashboard.service uses this path)"
+    echo "Move the repository there first:"
+    echo "  sudo mv \"$(pwd -P)\" $APP_DIR && sudo chown -R \"$USER\" $APP_DIR && cd $APP_DIR"
+    exit 1
+fi
+
 PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
 echo "[INFO] Python version: $PYTHON_VERSION"
 
@@ -100,13 +109,22 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+if [[ "$1" == "production" ]]; then
+    # The service runs as twitterbot and writes logs, the database and token.env here
+    sudo chown -R twitterbot:twitterbot "$APP_DIR"
+fi
+
 echo
 echo "=========================================="
 echo "   Setup Complete!"
 echo "=========================================="
 echo
 echo "Next steps:"
-echo "1. Edit token.env with your API keys"
+if [[ "$1" == "production" ]]; then
+    echo "1. Edit token.env with your API keys: sudo -u twitterbot nano $APP_DIR/token.env"
+else
+    echo "1. Edit token.env with your API keys"
+fi
 if [[ "$1" == "production" ]]; then
     echo "2. sudo systemctl start twitter-dashboard (start the bot from the dashboard)"
     echo "3. Check status: sudo systemctl status twitter-dashboard"

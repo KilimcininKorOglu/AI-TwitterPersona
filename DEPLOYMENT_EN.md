@@ -25,11 +25,14 @@ pip install gunicorn eventlet
 1. **Server deployment:**
 
 ```bash
-# Copy files to server
-scp -r AI-TwitterPersona/ user@server:/opt/ai-twitterpersona/
+# Copy files to server (the service files expect /opt/ai-twitterpersona)
+scp -r AI-TwitterPersona/ user@server:/tmp/AI-TwitterPersona
+ssh user@server
+sudo mv /tmp/AI-TwitterPersona /opt/ai-twitterpersona
+sudo chown -R "$USER" /opt/ai-twitterpersona
 
 # Virtual environment and dependencies on server
-cd /opt/ai-twitterpersona/AI-TwitterPersona
+cd /opt/ai-twitterpersona
 python3.11 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
@@ -40,7 +43,7 @@ pip install gunicorn eventlet
 
 ```bash
 # Edit token.env file
-cp token.env.example token.env
+cp .env.example token.env
 nano token.env
 
 # Enter required values:
@@ -55,20 +58,16 @@ nano token.env
 3. **Systemd service setup:**
 
 ```bash
-# Edit service file
-sudo cp systemd_service.service /etc/systemd/system/ai-twitterpersona.service
-sudo nano /etc/systemd/system/ai-twitterpersona.service
-
-# Update paths:
-# WorkingDirectory=/opt/ai-twitterpersona/AI-TwitterPersona
-# Environment=PATH=/opt/ai-twitterpersona/AI-TwitterPersona/venv/bin
-# ExecStart=/opt/ai-twitterpersona/AI-TwitterPersona/venv/bin/gunicorn
+# The service runs as the twitterbot user from /opt/ai-twitterpersona
+sudo useradd --create-home --shell /bin/bash twitterbot
+sudo chown -R twitterbot:twitterbot /opt/ai-twitterpersona
+sudo cp twitter-dashboard.service /etc/systemd/system/twitter-dashboard.service
 
 # Enable service
 sudo systemctl daemon-reload
-sudo systemctl enable ai-twitterpersona
-sudo systemctl start ai-twitterpersona
-sudo systemctl status ai-twitterpersona
+sudo systemctl enable twitter-dashboard
+sudo systemctl start twitter-dashboard
+sudo systemctl status twitter-dashboard
 ```
 
 4. **Nginx reverse proxy:**
@@ -212,13 +211,13 @@ sudo ufw enable
 # Log rotation
 sudo nano /etc/logrotate.d/ai-twitterpersona
 
-/opt/ai-twitterpersona/AI-TwitterPersona/logs/*.log {
+/opt/ai-twitterpersona/logs/*.log {
     daily
     missingok
     rotate 52
     compress
     notifempty
-    create 644 www-data www-data
+    create 644 twitterbot twitterbot
 }
 ```
 
@@ -229,7 +228,7 @@ sudo nano /etc/logrotate.d/ai-twitterpersona
 crontab -e
 
 # Health check every 5 minutes
-*/5 * * * * curl -f http://localhost:8080/api/status || systemctl restart ai-twitterpersona
+*/5 * * * * curl -f http://localhost:8080/api/status || systemctl restart twitter-dashboard
 ```
 
 ### 3. Performance Monitoring
@@ -244,18 +243,18 @@ crontab -e
 
 ```bash
 # Stop service
-sudo systemctl stop ai-twitterpersona
+sudo systemctl stop twitter-dashboard
 
 # Update code
-cd /opt/ai-twitterpersona/AI-TwitterPersona
-git pull origin main
+cd /opt/ai-twitterpersona
+sudo -u twitterbot git pull origin main
 
 # Update dependencies
 source venv/bin/activate
 pip install -r requirements.txt
 
 # Start service
-sudo systemctl start ai-twitterpersona
+sudo systemctl start twitter-dashboard
 ```
 
 ### 2. Backup
@@ -269,10 +268,10 @@ tar -czf backup-$(date +%Y%m%d).tar.gz token.env twitter.db logs/
 
 ```bash
 # Service status
-sudo systemctl status ai-twitterpersona
+sudo systemctl status twitter-dashboard
 
 # Check logs
-sudo journalctl -u ai-twitterpersona -f
+sudo journalctl -u twitter-dashboard -f
 
 # Application logs
 tail -f logs/twitter_bot.log
