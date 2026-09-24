@@ -135,11 +135,7 @@ def createDatabase():
                 );"""
         cursor.execute(tableQuery)
 
-        # Migration: tables created before the persona column existed
-        existing_columns = {row[1] for row in cursor.execute(f"PRAGMA table_info({tableName})")}
-        if 'persona' not in existing_columns:
-            cursor.execute(f"ALTER TABLE {tableName} ADD COLUMN persona VARCHAR(20)")
-            print(f"[+] Added persona column to {tableName}")
+        add_persona_column_if_missing(cursor)
         db.commit()  # Save changes to database
         print(f"[+] Database- {dbName} and Table- {tableName} Created.")
         
