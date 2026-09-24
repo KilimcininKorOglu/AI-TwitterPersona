@@ -13,7 +13,8 @@ services:
       - WEB_DEBUG=False
       - WORKERS=1
     volumes:
-      - ./token.env:/app/token.env:ro
+      # Writable: the settings page saves changes to token.env
+      - ./token.env:/app/token.env
       - ./logs:/app/logs
       - ./twitter.db:/app/twitter.db
       - ./topic_cache.json:/app/topic_cache.json

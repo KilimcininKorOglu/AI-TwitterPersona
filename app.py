@@ -12,6 +12,7 @@ import os
 from config import get_config, get_int_config, get_bool_config, reload_config, get_sleep_hours  # Centralized configuration
 import sqlite3
 from datetime import datetime, timedelta, timezone
+import errno
 import json
 import math
 from functools import lru_cache
@@ -1696,9 +1697,20 @@ def write_file_atomic(path, lines):
             os.fsync(f.fileno())
         if os.path.exists(path):
             os.chmod(temp_path, os.stat(path).st_mode & 0o777)
-        os.replace(temp_path, path)
+        try:
+            os.replace(temp_path, path)
+        except OSError as replace_error:
+            # A single-file Docker bind mount cannot be renamed over (EBUSY);
+            # write in place instead, the caller has already made a backup
+            if replace_error.errno != errno.EBUSY:
+                raise
+            secure_log('warning', f"{path} is a mount point, writing it in place instead of atomically")
+            with open(path, 'w', encoding='utf-8') as f:
+                f.writelines(lines)
+            os.unlink(temp_path)
     except BaseException:
-        os.unlink(temp_path)
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
         raise
 
 def update_token_env(new_config):
