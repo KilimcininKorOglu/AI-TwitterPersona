@@ -1585,6 +1585,92 @@ def validate_config_value(key, value):
     except (ValueError, TypeError) as e:
         return False, "", f"Invalid {rule['description']}: {str(e)}"
 
+TOKEN_ENV_FILE = 'token.env'
+token_env_lock = threading.Lock()
+
+# Settings keys mapped to their token.env variable names
+CONFIG_ENV_KEYS = {
+    'sleep_hours': 'SLEEP_HOURS',
+    'trends_limit': 'TRENDS_LIMIT',
+    'cycle_duration': 'CYCLE_DURATION_MINUTES',
+    'trend_country': 'TRENDS_URL',
+    'ai_temperature': 'AI_TEMPERATURE',
+    'ai_model': 'GEMINI_MODEL',
+    # API Credentials
+    'api_key': 'api_key',
+    'api_secret': 'api_secret',
+    'access_token': 'access_token',
+    'access_token_secret': 'access_token_secret',
+    'bearer_token': 'bearer_token',
+    'user_id': 'USER_ID',
+    'gemini_api_key': 'gemini_api_key',
+    'flask_secret_key': 'FLASK_SECRET_KEY'
+}
+
+# Country to URL mappings
+COUNTRY_TREND_URLS = {
+    'turkey': 'https://xtrends.iamrohit.in/turkey',
+    'usa': 'https://xtrends.iamrohit.in/united-states',
+    'uk': 'https://xtrends.iamrohit.in/united-kingdom',
+    'germany': 'https://xtrends.iamrohit.in/germany',
+    'france': 'https://xtrends.iamrohit.in/france',
+    'italy': 'https://xtrends.iamrohit.in/italy',
+    'spain': 'https://xtrends.iamrohit.in/spain',
+    'netherlands': 'https://xtrends.iamrohit.in/netherlands',
+    'canada': 'https://xtrends.iamrohit.in/canada',
+    'australia': 'https://xtrends.iamrohit.in/australia',
+    'japan': 'https://xtrends.iamrohit.in/japan',
+    'korea': 'https://xtrends.iamrohit.in/south-korea',
+    'india': 'https://xtrends.iamrohit.in/india',
+    'brazil': 'https://xtrends.iamrohit.in/brazil',
+    'mexico': 'https://xtrends.iamrohit.in/mexico'
+}
+
+def token_env_line(config_key, value):
+    """Build one token.env line for a validated setting."""
+    if config_key == 'trend_country':
+        # Convert country code to URL (already validated)
+        value = COUNTRY_TREND_URLS.get(value, COUNTRY_TREND_URLS['turkey'])
+    # SECURITY: Remove characters that could inject extra lines into the env file
+    sanitized_value = str(value).replace('\n', '').replace('\r', '').replace('\0', '')
+    return f"{CONFIG_ENV_KEYS[config_key]}={sanitized_value}\n"
+
+def render_token_env_lines(lines, validated_config):
+    """Replace existing lines for validated settings and append the ones missing from the file."""
+    env_to_config = {env_key: config_key for config_key, env_key in CONFIG_ENV_KEYS.items()}
+    written = set()
+    updated_lines = []
+    for line in lines:
+        config_key = env_to_config.get(line.split('=', 1)[0]) if '=' in line else None
+        if config_key in validated_config:
+            updated_lines.append(token_env_line(config_key, validated_config[config_key]))
+            written.add(config_key)
+        else:
+            updated_lines.append(line)
+
+    missing = [key for key in validated_config if key not in written]
+    if missing and updated_lines and not updated_lines[-1].endswith('\n'):
+        updated_lines[-1] += '\n'
+    updated_lines.extend(token_env_line(key, validated_config[key]) for key in missing)
+    return updated_lines
+
+def write_file_atomic(path, lines):
+    """Write lines to a temp file and rename it over path, so a crash cannot truncate path."""
+    directory = os.path.dirname(os.path.abspath(path))
+    import tempfile
+    fd, temp_path = tempfile.mkstemp(dir=directory, prefix='.token.env.')
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            f.writelines(lines)
+            f.flush()
+            os.fsync(f.fileno())
+        if os.path.exists(path):
+            os.chmod(temp_path, os.stat(path).st_mode & 0o777)
+        os.replace(temp_path, path)
+    except BaseException:
+        os.unlink(temp_path)
+        raise
+
 def update_token_env(new_config):
     """Update token.env file with validated configuration values"""
     try:
@@ -1607,84 +1693,23 @@ def update_token_env(new_config):
             raise ValueError(f"Configuration validation failed: {error_summary}")
         
         secure_log('info', f"All {len(validated_config)} configuration values validated successfully")
-        # Read current token.env file
-        with open('token.env', 'r', encoding='utf-8') as f:
-            lines = f.readlines()
-        
-        # Configuration mappings
-        config_mappings = {
-            'sleep_hours': 'SLEEP_HOURS',
-            'trends_limit': 'TRENDS_LIMIT',
-            'cycle_duration': 'CYCLE_DURATION_MINUTES',
-            'trend_country': 'TRENDS_URL',
-            'ai_temperature': 'AI_TEMPERATURE',
-            'ai_model': 'GEMINI_MODEL',
-            # API Credentials
-            'api_key': 'api_key',
-            'api_secret': 'api_secret',
-            'access_token': 'access_token',
-            'access_token_secret': 'access_token_secret',
-            'bearer_token': 'bearer_token',
-            'user_id': 'USER_ID',
-            'gemini_api_key': 'gemini_api_key',
-            'flask_secret_key': 'FLASK_SECRET_KEY'
-        }
-        
-        # Country to URL mappings
-        country_urls = {
-            'turkey': 'https://xtrends.iamrohit.in/turkey',
-            'usa': 'https://xtrends.iamrohit.in/united-states',
-            'uk': 'https://xtrends.iamrohit.in/united-kingdom',
-            'germany': 'https://xtrends.iamrohit.in/germany',
-            'france': 'https://xtrends.iamrohit.in/france',
-            'italy': 'https://xtrends.iamrohit.in/italy',
-            'spain': 'https://xtrends.iamrohit.in/spain',
-            'netherlands': 'https://xtrends.iamrohit.in/netherlands',
-            'canada': 'https://xtrends.iamrohit.in/canada',
-            'australia': 'https://xtrends.iamrohit.in/australia',
-            'japan': 'https://xtrends.iamrohit.in/japan',
-            'korea': 'https://xtrends.iamrohit.in/south-korea',
-            'india': 'https://xtrends.iamrohit.in/india',
-            'brazil': 'https://xtrends.iamrohit.in/brazil',
-            'mexico': 'https://xtrends.iamrohit.in/mexico'
-        }
 
-        # Update lines with validated values only
-        updated_lines = []
-        for line in lines:
-            line_updated = False
-            for config_key, env_key in config_mappings.items():
-                if line.startswith(f"{env_key}=") and config_key in validated_config:
-                    if config_key == 'trend_country':
-                        # Convert country code to URL (already validated)
-                        country = validated_config[config_key]
-                        value = country_urls.get(country, country_urls['turkey'])
-                    else:
-                        value = str(validated_config[config_key])
-                    
-                    # SECURITY: Additional sanitization for environment variables
-                    # Remove any potentially dangerous characters
-                    sanitized_value = value.replace('\n', '').replace('\r', '').replace('\0', '')
-                    updated_lines.append(f"{env_key}={sanitized_value}\n")
-                    line_updated = True
-                    break
-            
-            if not line_updated:
-                updated_lines.append(line)
-        
-        # SECURITY: Create backup before modifying file
-        backup_filename = 'token.env.backup'
-        try:
-            with open('token.env', 'r', encoding='utf-8') as original:
-                with open(backup_filename, 'w', encoding='utf-8') as backup:
-                    backup.write(original.read())
-        except Exception as backup_error:
-            print(f"[WARNING] Could not create backup: {backup_error}")
-        
-        # Write validated configuration back to file
-        with open('token.env', 'w', encoding='utf-8') as f:
-            f.writelines(updated_lines)
-        
+        # Serialize read-modify-write so concurrent saves cannot drop each other's changes
+        with token_env_lock:
+            with open(TOKEN_ENV_FILE, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+
+            updated_lines = render_token_env_lines(lines, validated_config)
+
+            # SECURITY: Create backup before modifying file
+            try:
+                with open(TOKEN_ENV_FILE + '.backup', 'w', encoding='utf-8') as backup:
+                    backup.writelines(lines)
+            except OSError as backup_error:
+                print(f"[WARNING] Could not create backup: {backup_error}")
+
+            write_file_atomic(TOKEN_ENV_FILE, updated_lines)
+
         # Log security event (sanitized)
         secure_log('info', f"Configuration updated in token.env with {len(validated_config)} validated values")
         secure_log('info', "Updated keys", list(validated_config.keys()))

@@ -164,6 +164,7 @@ cython_debug/
 # Project specific files
 # API keys and secrets
 token.env
+.token.env.*
 .env.local
 .env.production
 
