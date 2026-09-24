@@ -924,13 +924,12 @@ def api_emergency_stop():
     global bot_running, bot_thread
     
     try:
-        bot_running = False
-        
-        # Kill bot thread if running
-        if bot_thread and bot_thread.is_alive():
-            # Force stop thread (in real implementation, use proper thread management)
-            pass
-        
+        with bot_lock:
+            bot_running = False
+            # Signal the bot thread; it exits at its next stop-event check
+            bot_stop_event.set()
+            bot_stats["bot_start_time"] = None
+
         # Broadcast emergency stop to all clients
         socketio.emit('emergency_stop', {
             'message': 'ACİL DURDURMA - Tüm bot işlemleri durduruldu',
