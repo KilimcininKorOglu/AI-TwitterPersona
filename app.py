@@ -1217,6 +1217,82 @@ def mark_bot_stopped_if_current():
         if bot_thread is threading.current_thread():
             bot_running = False
 
+def bot_log(level, message):
+    """Print a timestamped bot message and send it to the monitoring console."""
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] {message}")
+    broadcast_console_log(level, message)
+
+def build_bot_prompt():
+    """
+    Build the AI prompt for one bot cycle.
+
+    Returns:
+        tuple: (prompt, topic); prompt is None when no trending topic was found
+    """
+    if not main.isTrendingTime():
+        bot_log('INFO', 'Sleep hour - using general prompt')
+        return "En ilgi çekici ve güncel konuda bir tweet oluştur.", ""
+
+    bot_log('INFO', 'Getting trending topics...')
+    topic = main.trending_tweets()
+    if not topic:
+        bot_log('WARNING', 'No trending topics found')
+        return None, ""
+
+    prompt = f"Bunlar tweet detayları. [format- konu, tweet sayısı, tweet URL] {topic}. Tüm bu detayları tweet bilgin için kullan, referans için değil."
+    context = "Kullanıcı tarafından ek bağlam eklenmedi. Konu detaylarını kullanarak bağlamı ve amacı anlamalısın. Tweet referansı için detayları kullan."
+    return prompt + " " + context, topic
+
+def post_bot_tweet(tweet, persona):
+    """Post a generated tweet, save it and broadcast the result."""
+    bot_log('SUCCESS', f'Tweet generated: {tweet}')
+    status = main.scheduled_tweet(tweet)
+    database.save_tweets(tweet=tweet, tweet_type="tweet", status=status, persona=persona)
+
+    if not status:
+        bot_log('ERROR', 'Failed to post tweet')
+        return
+    bot_log('SUCCESS', 'Tweet posted successfully!')
+    bot_stats["last_tweet"] = tweet[:50] + "..." if len(tweet) > 50 else tweet
+    bot_stats["last_tweet_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    socketio.emit('new_tweet', {
+        'tweet': tweet,
+        'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    })
+
+def run_bot_cycle(stop_event):
+    """
+    Run one bot cycle: build a prompt, generate a tweet and post it.
+
+    Returns:
+        float or None: seconds to wait before the next cycle, None to stop the bot
+    """
+    prompt, topic = build_bot_prompt()
+    if prompt is None:
+        return 60  # Wait before retrying the trends fetch
+
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] Generating Reply...Topic: {prompt[:100]}...")
+    broadcast_console_log('INFO', f'Generating AI tweet for: {str(topic)[:100] if topic else "general topic"}')
+    tweet, persona = main.reply.generate_reply_with_persona(prompt)
+
+    if tweet is None:
+        bot_log('WARNING', 'Political topic detected, skipping to avoid controversy')
+        return 10  # Try another topic after a short wait
+    if stop_event.is_set():
+        return None  # Stop was requested while the tweet was generated; do not post it
+    if tweet:
+        post_bot_tweet(tweet, persona)
+    else:
+        bot_log('ERROR', 'Failed to generate tweet')
+
+    bot_stats["last_check"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Read the cycle length each time so a value saved from the settings page
+    # applies to the next cycle
+    cycle_minutes = main.get_cycle_duration_minutes()
+    bot_log('INFO', f'Next tweet in {cycle_minutes} minutes')
+    return cycle_minutes * 60
+
 def run_bot_thread(stop_event):
     """Run bot in separate thread with proper event-based termination"""
     if not API_MODULES_LOADED or not main:
@@ -1234,101 +1310,16 @@ def run_bot_thread(stop_event):
 
         while not stop_event.is_set():
             try:
-                prompt = ""
-                topic = ""
-
-                # Check if it's trending time
-                if main.isTrendingTime():
-                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Getting Trending Topics...")
-                    broadcast_console_log('INFO', 'Getting trending topics...')
-
-                    # Get trending topics
-                    topic = main.trending_tweets()
-                    if not topic:
-                        print("[!] No trending topics found")
-                        broadcast_console_log('WARNING', 'No trending topics found')
-                        # Wait before retry
-                        if stop_event.wait(timeout=60):
-                            break
-                        continue
-
-                    # Create prompt for AI
-                    prompt += f"Bunlar tweet detayları. [format- konu, tweet sayısı, tweet URL] {topic}. Tüm bu detayları tweet bilgin için kullan, referans için değil."
-                    context = "Kullanıcı tarafından ek bağlam eklenmedi. Konu detaylarını kullanarak bağlamı ve amacı anlamalısın. Tweet referansı için detayları kullan."
-                    prompt += " " + context
-                else:
-                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Sleep hour - using general prompt")
-                    broadcast_console_log('INFO', 'Sleep hour - using general prompt')
-                    prompt = "En ilgi çekici ve güncel konuda bir tweet oluştur."
-
-                # Generate AI tweet
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] Generating Reply...Topic: {prompt[:100]}...")
-                broadcast_console_log('INFO', f'Generating AI tweet for: {str(topic)[:100] if topic else "general topic"}')
-
-                if hasattr(main, 'reply') and main.reply:
-                    tweet, persona = main.reply.generate_reply_with_persona(prompt)
-                else:
-                    # Fallback if reply module not available
-                    import reply
-                    tweet, persona = reply.generate_reply_with_persona(prompt)
-
-                # Check if tweet is None (political topic)
-                if tweet is None:
-                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Political topic detected, skipping...")
-                    broadcast_console_log('WARNING', 'Political topic detected, skipping to avoid controversy')
-                    # Try again with shorter wait
-                    if stop_event.wait(timeout=10):
-                        break
-                    continue
-                elif stop_event.is_set():
-                    # Stop was requested while the tweet was generated; do not post it
-                    break
-                elif tweet:
-                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Tweet generated: {tweet}")
-                    broadcast_console_log('SUCCESS', f'Tweet generated: {tweet}')
-
-                    # Post tweet
-                    status = main.scheduled_tweet(tweet)
-
-                    # Save to database
-                    database.save_tweets(tweet=tweet, tweet_type="tweet", status=status, persona=persona)
-
-                    if status:
-                        print(f"[{datetime.now().strftime('%H:%M:%S')}] Tweet posted successfully!")
-                        broadcast_console_log('SUCCESS', 'Tweet posted successfully!')
-                        bot_stats["last_tweet"] = tweet[:50] + "..." if len(tweet) > 50 else tweet
-                        bot_stats["last_tweet_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-                        # Emit new tweet event
-                        socketio.emit('new_tweet', {
-                            'tweet': tweet,
-                            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        })
-                    else:
-                        print(f"[{datetime.now().strftime('%H:%M:%S')}] Failed to post tweet")
-                        broadcast_console_log('ERROR', 'Failed to post tweet')
-                else:
-                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Failed to generate tweet")
-                    broadcast_console_log('ERROR', 'Failed to generate tweet')
-
-                # Update stats
-                bot_stats["last_check"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-                # Sleep with interruptible wait; read the cycle length each time so
-                # a value saved from the settings page applies to the next cycle
-                cycle_minutes = main.get_cycle_duration_minutes()
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] Sleeping for {cycle_minutes} minutes...")
-                broadcast_console_log('INFO', f'Next tweet in {cycle_minutes} minutes')
-
-                if stop_event.wait(timeout=cycle_minutes * 60):
-                    break  # Event was set during wait, exit loop
-
+                wait_seconds = run_bot_cycle(stop_event)
             except Exception as cycle_error:
                 print(f"Bot cycle error: {cycle_error}")
                 broadcast_console_log('ERROR', f'Bot cycle error: {str(cycle_error)}')
-                # Continue running even if one cycle fails
-                if stop_event.wait(timeout=60):  # Wait 1 minute before retry
-                    break
+                # Continue running even if one cycle fails; wait 1 minute before retry
+                wait_seconds = 60
+
+            # Interruptible wait; exit when stop is requested
+            if wait_seconds is None or stop_event.wait(timeout=wait_seconds):
+                break
 
     except Exception as e:
         print(f"Bot thread error: {e}")
