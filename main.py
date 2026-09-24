@@ -142,9 +142,8 @@ def scheduled_tweet(tweets):
     Returns:
         bool: True if tweet was posted successfully, False otherwise
     """
-    import time
     STATUS = False  # Default status is failure
-    max_retries = 3
+    max_retries = 3  # Total attempts, so at most two backoff waits
     retry_count = 0
     
     # Initialize Twitter client if needed
@@ -166,10 +165,10 @@ def scheduled_tweet(tweets):
             # Check for rate limit errors
             if "rate limit" in error_msg or "too many requests" in error_msg or "429" in error_msg:
                 retry_count += 1
-                wait_time = (2 ** retry_count) * 60  # Exponential backoff: 2, 4, 8 minutes
-                print(f"[!] Twitter API Rate Limit Exceeded. Waiting {wait_time//60} minutes before retry {retry_count}/{max_retries}")
-                
+                wait_time = (2 ** retry_count) * 60  # Exponential backoff: 2, then 4 minutes
+
                 if retry_count < max_retries:
+                    print(f"[!] Twitter API Rate Limit Exceeded. Waiting {wait_time//60} minutes before attempt {retry_count + 1}/{max_retries}")
                     time.sleep(wait_time)
                     continue
                 else:
