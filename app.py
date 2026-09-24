@@ -2325,12 +2325,12 @@ def get_realtime_stats():
         else:
             stats['success_rate'] = 100.0
 
-        # Count API calls today
-        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        # Count API calls today in the configured local timezone (created_at is UTC
+        # text "YYYY-MM-DD HH:MM:SS", so compare dates, not ISO strings with a "T")
         cursor.execute("""
             SELECT COUNT(*) FROM tweets
-            WHERE created_at >= ?
-        """, (today_start.isoformat(),))
+            WHERE DATE(created_at, ?) = ?
+        """, (sqlite_tz_modifier(), local_now().strftime("%Y-%m-%d")))
         stats['api_calls'] = cursor.fetchone()[0]
 
         cursor.close()
