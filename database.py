@@ -366,7 +366,10 @@ def update_prompt(prompt_type, prompt_text, description=None):
                             SET prompt_text = ?, updated_at = CURRENT_TIMESTAMP 
                             WHERE prompt_type = ?""", 
                           (prompt_text, prompt_type))
-        
+
+        if cursor.rowcount == 0:
+            print(f"[-] Prompt '{prompt_type}' not found")
+            return False
         db.commit()
         print(f"[+] Prompt '{prompt_type}' updated successfully")
         return True
@@ -430,7 +433,10 @@ def toggle_prompt_status(prompt_type):
         cursor.execute("""UPDATE prompts 
                         SET is_active = NOT is_active, updated_at = CURRENT_TIMESTAMP 
                         WHERE prompt_type = ?""", (prompt_type,))
-        
+
+        if cursor.rowcount == 0:
+            print(f"[-] Prompt '{prompt_type}' not found")
+            return False
         db.commit()
         print(f"[+] Prompt '{prompt_type}' status toggled")
         return True
@@ -559,7 +565,10 @@ def update_persona_setting(setting_key, setting_value):
                         SET setting_value = ?, updated_at = CURRENT_TIMESTAMP 
                         WHERE setting_key = ?""", 
                       (setting_value, setting_key))
-        
+
+        if cursor.rowcount == 0:
+            print(f"[-] Persona setting '{setting_key}' not found")
+            return False
         db.commit()
         print(f"[+] Persona setting '{setting_key}' updated to '{setting_value}'")
         return True
