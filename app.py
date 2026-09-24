@@ -620,7 +620,9 @@ def api_manual_tweet():
     persona = request.json.get('persona', 'casual')
     
     # Validate and sanitize input
-    tweet_text = sanitize_input(tweet_text)
+    # Tweets are plain text for Twitter and the dashboard renders them escaped,
+    # so keep "<", ">" and "data:" instead of stripping them like HTML
+    tweet_text = (tweet_text or "").strip()
     is_valid, error_message = validate_tweet_text(tweet_text)
     
     if not is_valid:
@@ -2608,12 +2610,7 @@ def validate_tweet_text(text):
     # Check for extremely long tweets (probably an error)
     if len(text) > 2000:
         return False, "Tweet çok uzun (muhtemelen hata)"
-    
-    # Remove potentially harmful content
-    import re
-    if re.search(r'<script|javascript:|data:', text, re.IGNORECASE):
-        return False, "Geçersiz karakter dizisi"
-    
+
     # Create detailed validation message
     message = f"Geçerli ({twitter_length}/280 karakter)"
     if twitter_metrics['url_count'] > 0:
