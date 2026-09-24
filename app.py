@@ -565,10 +565,11 @@ def api_control():
         return jsonify({"success": False, "message": "Bot modülleri yüklenmedi - API anahtarlarını kontrol edin"}), 400
     
     # Validate request JSON
-    if not request.json:
+    data = request.get_json(silent=True)
+    if not data:
         return jsonify({"success": False, "message": "JSON verisi gerekli"}), 400
-    
-    action = request.json.get('action')
+
+    action = data.get('action')
     
     # Validate action parameter
     if not action or action not in ['start', 'stop']:
@@ -629,8 +630,9 @@ def api_manual_tweet():
     if not API_MODULES_LOADED or not main:
         return jsonify({"success": False, "message": "Bot modülleri yüklenmedi - API anahtarlarını kontrol edin"}), 400
     
-    tweet_text = request.json.get('text')
-    persona = request.json.get('persona', 'casual')
+    data = request.get_json(silent=True) or {}  # A missing or invalid JSON body means no text
+    tweet_text = data.get('text')
+    persona = data.get('persona', 'casual')
     
     # Validate and sanitize input
     # Tweets are plain text for Twitter and the dashboard renders them escaped,
@@ -666,8 +668,9 @@ def api_enhance_tweet():
     if not API_MODULES_LOADED or not reply:
         return jsonify({"success": False, "message": "AI modülü yüklenmedi"}), 400
 
-    original_text = request.json.get('text', '').strip()
-    persona = request.json.get('persona', 'casual')
+    data = request.get_json(silent=True) or {}  # A missing or invalid JSON body means no text
+    original_text = (data.get('text') or '').strip()
+    persona = data.get('persona', 'casual')
 
     if not original_text:
         return jsonify({"success": False, "message": "Tweet metni gerekli"}), 400
@@ -2106,7 +2109,7 @@ def import_tweet_rows(conn, tweets):
 def api_import_database():
     """Import database from JSON backup"""
     try:
-        import_data = request.get_json()
+        import_data = request.get_json(silent=True)
         
         if not import_data or 'tweets' not in import_data:
             return jsonify({
@@ -2186,7 +2189,7 @@ def api_get_prompts():
 def api_update_prompt(prompt_type):
     """Update a specific prompt"""
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         prompt_text = sanitize_input(data.get('prompt_text'))
         description = sanitize_input(data.get('description', ''))
         
@@ -2300,7 +2303,7 @@ def api_get_persona_settings():
 def api_update_persona_setting(setting_key):
     """Update a specific persona setting"""
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         setting_value = sanitize_input(data.get('setting_value'))
         
         if not setting_value:
