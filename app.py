@@ -29,13 +29,15 @@ import tweet_length as tweet_length_rules
 # Security-aware logging system
 def setup_secure_logging():
     """Setup secure logging with sanitization"""
+    # os.makedirs returns None, so create the directory first instead of using it in a condition
+    os.makedirs('logs', exist_ok=True)
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
         handlers=[
             logging.StreamHandler(),
             logging.FileHandler('logs/security.log', mode='a', encoding='utf-8')
-        ] if os.path.exists('logs') or os.makedirs('logs', exist_ok=True) else [logging.StreamHandler()]
+        ]
     )
     return logging.getLogger(__name__)
 
