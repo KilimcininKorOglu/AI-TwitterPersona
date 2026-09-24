@@ -238,82 +238,72 @@ def run_bot():
         return
 
     print("[+] Bot initialization complete. Entering main loop...")
-    
+
     while True:
-        prompt = ""  # Initialize prompt for AI tweet generation
-        topic = ""   # Initialize topic container
-        
-        # Check if current time allows trending topic posting
-        if isTrendingTime():
-            print("[+] Getting Trending Topics...")
-            
-            # Fetch trending topics from Turkey
-            topic = trending_tweets()
-            if not topic:
-                time.sleep(RETRY_DELAY_SECONDS)
-                continue  # Skip this cycle if no trends found
-            
-            # Create detailed prompt for AI with trending topic information
-            prompt += f"Bunlar tweet detayları. [format- konu, tweet sayısı, tweet URL] {topic}. Tüm bu detayları tweet bilgin için kullan, referans için değil."
-            
-            # Add context for better AI understanding
-            context = "Kullanıcı tarafından ek bağlam eklenmedi. Konu detaylarını kullanarak bağlamı ve amacı anlamalısın. Tweet referansı için detayları kullan."
-            prompt += " " + context
-            
-        else:
-            # Use general prompt when not in trending time
-            prompt = "En ilgi çekici ve güncel konuda bir tweet oluştur."
-            
-        # Generate AI-powered tweet using the prepared prompt
-        print("Generating Reply...Topic: ", prompt)
-        tweet, persona = reply.generate_reply_with_persona(prompt)
+        run_bot_cycle()
 
-        # Check if tweet is None (political topic)
-        if tweet is None:
-            print("[!] Political topic detected, trying another trending topic...")
-            # Skip this topic and try to get another one
-            time.sleep(POLITICAL_SKIP_DELAY_SECONDS)
-            continue
-        elif tweet:
-            print(f"Tweet: {tweet}")
+def build_prompt():
+    """
+    Build the AI prompt for one cycle.
 
-            # Auto-approve tweet posting (manual approval option commented out)
-            option = "y"  # Automatic approval for autonomous operation
-            
-            if "y" == option:
-                # Post the tweet to Twitter
-                status = scheduled_tweet(tweet)
-                
-                # Log the tweet attempt to database (success or failure)
-                database.save_tweets(tweet=tweet, tweet_type="tweet", status=status, persona=persona)
-                
-                # If tweet posting failed, wait and continue to next cycle
-                if not status:
-                    time.sleep(RETRY_DELAY_SECONDS)
-                    continue
-                
-                # Successfully posted - begin sleep cycle
-                cycle_minutes = get_cycle_duration_minutes()
-                print(f"[+] Bot Cycle Complete. Sleeping for {cycle_minutes} minutes... ---\n")
+    Returns:
+        str or None: The prompt, or None when no trending topic was found
+    """
+    # Use general prompt when not in trending time
+    if not isTrendingTime():
+        return "En ilgi çekici ve güncel konuda bir tweet oluştur."
 
-                # Convert minutes to seconds for sleep timer
-                timer = 60 * cycle_minutes
-                
-                # Countdown timer with live display
-                for i in range(timer + 1):
-                    print(f"[+]Remaining Time [{timer-i}] ", end="\r")
-                    time.sleep(1)  # Sleep for 1 second intervals
-                    
-            elif option == "n":
-                continue  # Skip this cycle (unused in automatic mode)
-            elif option == "exit":
-                quit()    # Exit bot (unused in automatic mode)
-                break
-                
-            print("\n")  # Add newline after cycle completion
-        else:
-            print("Reply not generated...")  # AI failed to generate tweet
-            time.sleep(RETRY_DELAY_SECONDS)
+    print("[+] Getting Trending Topics...")
+    topic = trending_tweets()
+    if not topic:
+        return None
+
+    # Create detailed prompt for AI with trending topic information
+    prompt = f"Bunlar tweet detayları. [format- konu, tweet sayısı, tweet URL] {topic}. Tüm bu detayları tweet bilgin için kullan, referans için değil."
+    # Add context for better AI understanding
+    context = "Kullanıcı tarafından ek bağlam eklenmedi. Konu detaylarını kullanarak bağlamı ve amacı anlamalısın. Tweet referansı için detayları kullan."
+    return prompt + " " + context
+
+def sleep_with_countdown(seconds):
+    """Sleep for seconds while showing a live countdown."""
+    for i in range(seconds + 1):
+        print(f"[+]Remaining Time [{seconds-i}] ", end="\r")
+        time.sleep(1)  # Sleep for 1 second intervals
+    print("\n")  # Add newline after cycle completion
+
+def run_bot_cycle():
+    """Run one cycle: build a prompt, generate a tweet, post it and wait."""
+    prompt = build_prompt()
+    if prompt is None:
+        time.sleep(RETRY_DELAY_SECONDS)  # Skip this cycle if no trends found
+        return
+
+    # Generate AI-powered tweet using the prepared prompt
+    print("Generating Reply...Topic: ", prompt)
+    tweet, persona = reply.generate_reply_with_persona(prompt)
+
+    if tweet is None:
+        # Political topic: skip it and try another one after a short wait
+        print("[!] Political topic detected, trying another trending topic...")
+        time.sleep(POLITICAL_SKIP_DELAY_SECONDS)
+        return
+    if not tweet:
+        print("Reply not generated...")  # AI failed to generate tweet
+        time.sleep(RETRY_DELAY_SECONDS)
+        return
+
+    print(f"Tweet: {tweet}")
+    # Post the tweet and log the attempt to the database (success or failure)
+    status = scheduled_tweet(tweet)
+    database.save_tweets(tweet=tweet, tweet_type="tweet", status=status, persona=persona)
+    if not status:
+        time.sleep(RETRY_DELAY_SECONDS)
+        return
+
+    # Successfully posted - begin sleep cycle
+    cycle_minutes = get_cycle_duration_minutes()
+    print(f"[+] Bot Cycle Complete. Sleeping for {cycle_minutes} minutes... ---\n")
+    sleep_with_countdown(60 * cycle_minutes)
 
 # Start the bot when this module is executed directly
 if __name__ == "__main__":
