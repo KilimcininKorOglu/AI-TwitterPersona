@@ -277,14 +277,15 @@ Sadece kategori adını döndür (political/tech/sad/casual)."""
         # Handle any other unexpected errors with full error details
         logging.error(f"Unexpected topic classification error: {type(e).__name__}: {str(e)}")
         category = "casual"
-
-    # Cache the result for future use with timestamp
-    from datetime import datetime
-    topic_cache[normalized] = {
-        'category': category,
-        'timestamp': datetime.now().isoformat()
-    }
-    save_cache()  # Save cache to disk for persistence
+    else:
+        # Cache only real classifications; an error fallback must not pin a
+        # political topic to 'casual' for the whole cache lifetime
+        from datetime import datetime
+        topic_cache[normalized] = {
+            'category': category,
+            'timestamp': datetime.now().isoformat()
+        }
+        save_cache()  # Save cache to disk for persistence
     return category
 
 def generate_reply(user_input):
