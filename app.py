@@ -402,6 +402,14 @@ class LoginForm(FlaskForm):
     password = PasswordField('Şifre', validators=[DataRequired()])
     submit = SubmitField('Giriş Yap')
 
+def is_safe_redirect_target(target):
+    """Allow only same-site relative paths as post-login redirect targets."""
+    if not target or not target.startswith('/') or target.startswith('//') or '\\' in target:
+        return False
+    from urllib.parse import urlparse
+    parsed = urlparse(target)
+    return not parsed.scheme and not parsed.netloc
+
 # Authentication routes
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -441,7 +449,7 @@ def login():
             flash('Başarıyla giriş yaptınız!', 'success')
             
             next_page = request.args.get('next')
-            return redirect(next_page) if next_page else redirect(url_for('dashboard'))
+            return redirect(next_page) if is_safe_redirect_target(next_page) else redirect(url_for('dashboard'))
         else:
             # Generic error message to prevent username enumeration
             flash('Geçersiz kimlik bilgileri', 'danger')
