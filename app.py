@@ -2106,6 +2106,36 @@ def import_tweet_rows(conn, tweets):
         imported_count += 1
     return imported_count, skipped_count
 
+def csv_safe_cell(value):
+    """Prefix cells that spreadsheets would run as formulas (CSV injection)."""
+    text = '' if value is None else str(value)
+    return "'" + text if text[:1] in ('=', '+', '-', '@', '\t', '\r') else text
+
+@app.route('/api/export/tweets', methods=['GET'])
+@login_required
+def api_export_tweets():
+    """Export tweet history as a CSV download"""
+    import csv
+    import io
+    from flask import Response
+
+    columns = ['id', 'tweet_text', 'tweet_type', 'sent', 'persona', 'tweet_date', 'tweet_time', 'created_at']
+    conn = sqlite3.connect(database.dbName)
+    try:
+        rows = conn.execute(f"SELECT {', '.join(columns)} FROM {tweets_table()} ORDER BY created_at DESC").fetchall()
+    finally:
+        conn.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(columns)
+    writer.writerows([csv_safe_cell(value) for value in row] for row in rows)
+
+    filename = f"tweets_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    # UTF-8 BOM so spreadsheet apps show Turkish characters correctly
+    return Response('﻿' + output.getvalue(), content_type='text/csv; charset=utf-8',
+                    headers={'Content-Disposition': f'attachment; filename="{filename}"'})
+
 @app.route('/api/import/database', methods=['POST'])
 @login_required
 def api_import_database():

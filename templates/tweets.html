@@ -292,7 +292,13 @@
         button.disabled = true;
         
         fetch('/api/export/tweets')
-        .then(response => response.blob())
+        .then(response => {
+            // Do not save an error page as a CSV file
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return response.blob();
+        })
         .then(blob => {
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
