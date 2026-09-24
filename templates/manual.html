@@ -304,15 +304,22 @@ endblock %} {% block content %}
       .then((data) => {
         const container = document.getElementById("trending-topics");
         if (data.trends && data.trends.length > 0) {
-          container.innerHTML = data.trends
-            .map((trend) => {
+          // Build nodes with textContent: trend names come from a scraped third-party site
+          container.replaceChildren(
+            ...data.trends.map((trend) => {
               // Extract just the hashtag part (including Turkish characters)
               const hashtagMatch = trend.match(/#[a-zA-Z0-9ğüşıöçĞÜŞİÖÇ]+/);
               const hashtag = hashtagMatch ? hashtagMatch[0] : trend;
 
-              return `<small class="badge bg-secondary text-light me-1 mb-1 trend-badge" style="cursor: pointer;" onclick="addHashtagToTweet('${hashtag}')" title="Tweet'e eklemek için tıklayın">${trend}</small>`;
+              const badge = document.createElement("small");
+              badge.className = "badge bg-secondary text-light me-1 mb-1 trend-badge";
+              badge.style.cursor = "pointer";
+              badge.title = "Tweet'e eklemek için tıklayın";
+              badge.textContent = trend;
+              badge.addEventListener("click", () => addHashtagToTweet(hashtag));
+              return badge;
             })
-            .join("");
+          );
         } else {
           container.innerHTML =
             '<small class="text-muted">Trend bulunamadı</small>';

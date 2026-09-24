@@ -29,7 +29,7 @@
                                         {% endif %}
                                     </div>
                                     <div>
-                                        <button class="btn btn-sm btn-outline-primary" onclick="tweetAboutTrend('{{ trend }}')">
+                                        <button class="btn btn-sm btn-outline-primary" data-trend="{{ trend }}" onclick="tweetAboutTrend(this.dataset.trend)">
                                             <i class="fas fa-paper-plane"></i> Tweet At
                                         </button>
                                     </div>
@@ -218,26 +218,13 @@
             .then(response => response.json())
             .then(data => {
                 if (data.trends && data.trends.length > 0) {
-                    let html = '<div class="row">';
-                    data.trends.forEach((trend, index) => {
-                        html += `
-                            <div class="col-12 mb-3">
-                                <div class="d-flex justify-content-between align-items-center p-3 border rounded">
-                                    <div class="flex-grow-1">
-                                        <h6 class="mb-1">${trend.split('(')[0].trim()}</h6>
-                                        ${trend.includes('(') ? `<small class="text-muted"><i class="fas fa-chart-line"></i> ${trend.split('(')[1].split(')')[0]}</small>` : ''}
-                                    </div>
-                                    <div>
-                                        <button class="btn btn-sm btn-primary" onclick="tweetAboutTrend('${trend}')">
-                                            <i class="fas fa-paper-plane"></i> Tweet At
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
+                    // Build nodes with textContent: trend names come from a scraped third-party site
+                    const row = document.createElement('div');
+                    row.className = 'row';
+                    data.trends.forEach((trend) => {
+                        row.appendChild(buildTrendItem(trend));
                     });
-                    html += '</div>';
-                    container.innerHTML = html;
+                    container.replaceChildren(row);
                 } else {
                     container.innerHTML = '<div class="text-center py-4"><i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i><h5 class="text-muted">Trend bulunamadı</h5></div>';
                 }
@@ -250,6 +237,41 @@
             });
     }
     
+    function buildTrendItem(trend) {
+        const col = document.createElement('div');
+        col.className = 'col-12 mb-3';
+        const box = document.createElement('div');
+        box.className = 'd-flex justify-content-between align-items-center p-3 border rounded';
+
+        const info = document.createElement('div');
+        info.className = 'flex-grow-1';
+        const title = document.createElement('h6');
+        title.className = 'mb-1';
+        title.textContent = trend.split('(')[0].trim();
+        info.appendChild(title);
+        if (trend.includes('(')) {
+            const count = document.createElement('small');
+            count.className = 'text-muted';
+            const icon = document.createElement('i');
+            icon.className = 'fas fa-chart-line';
+            count.append(icon, ' ' + trend.split('(')[1].split(')')[0]);
+            info.appendChild(count);
+        }
+
+        const actions = document.createElement('div');
+        const button = document.createElement('button');
+        button.className = 'btn btn-sm btn-primary';
+        const sendIcon = document.createElement('i');
+        sendIcon.className = 'fas fa-paper-plane';
+        button.append(sendIcon, ' Tweet At');
+        button.addEventListener('click', () => tweetAboutTrend(trend));
+        actions.appendChild(button);
+
+        box.append(info, actions);
+        col.appendChild(box);
+        return col;
+    }
+
     // Tweet about trend
     function tweetAboutTrend(trend) {
         if (confirm(`"${trend.split('(')[0].trim()}" hakkında tweet atmak istediğinizden emin misiniz?`)) {
