@@ -1931,6 +1931,29 @@ def api_analytics_hourly_activity():
             'message': f'Analytics error: {str(e)}'
         }), 500
 
+MAX_UNIQUE_TOPIC_WORDS = 1000  # Limit to prevent unbounded memory growth
+
+def add_topic_words(word_frequency, content):
+    """Count the words of one tweet; return False once the unique-word limit is reached."""
+    for word in content.lower().split():
+        # Clean word (remove punctuation)
+        clean_word = re.sub(r'[^\w\sğüşıöçĞÜŞİÖÇ]', '', word)
+        if len(clean_word) <= 3 or clean_word.startswith('http'):
+            continue
+        word_frequency[clean_word] = word_frequency.get(clean_word, 0) + 1
+        if len(word_frequency) >= MAX_UNIQUE_TOPIC_WORDS:
+            print(f"[WARNING] Word frequency dictionary reached limit ({MAX_UNIQUE_TOPIC_WORDS} words)")
+            return False
+    return True
+
+def count_topic_words(contents):
+    """Count words longer than 3 characters across tweet texts, up to MAX_UNIQUE_TOPIC_WORDS."""
+    word_frequency = {}
+    for content in contents:
+        if content and not add_topic_words(word_frequency, content):
+            break
+    return word_frequency
+
 @app.route('/api/analytics/trending_topics')
 @login_required
 def api_analytics_trending_topics():
@@ -1956,24 +1979,8 @@ def api_analytics_trending_topics():
         conn.close()
         
         # Simple word extraction with memory leak protection
-        word_frequency = {}
-        max_unique_words = 1000  # Limit to prevent unbounded memory growth
-        
-        for (content,) in results:
-            if content and len(word_frequency) < max_unique_words:
-                # Basic word extraction
-                words = content.lower().split()
-                for word in words:
-                    # Clean word (remove punctuation)
-                    clean_word = re.sub(r'[^\w\sğüşıöçĞÜŞİÖÇ]', '', word)
-                    if len(clean_word) > 3 and not clean_word.startswith('http'):
-                        word_frequency[clean_word] = word_frequency.get(clean_word, 0) + 1
-                        
-                        # Additional protection: stop if dictionary gets too large
-                        if len(word_frequency) >= max_unique_words:
-                            print(f"[WARNING] Word frequency dictionary reached limit ({max_unique_words} words)")
-                            break
-        
+        word_frequency = count_topic_words(content for (content,) in results)
+
         # Get top 15 words and clear large dictionary immediately
         sorted_words = sorted(word_frequency.items(), key=lambda x: x[1], reverse=True)[:15]
         word_frequency.clear()  # Explicit cleanup to prevent memory retention
