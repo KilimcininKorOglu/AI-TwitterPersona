@@ -11,7 +11,7 @@ import time
 import os
 from config import get_config, get_int_config, get_bool_config, reload_config  # Centralized configuration
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 from functools import lru_cache
 import gc  # For memory management
@@ -1014,16 +1014,15 @@ def api_force_tweet():
 def update_stats():
     """Update bot statistics from database"""
     global bot_stats
+    safe_table = get_safe_table_name()
+    if not safe_table:
+        return
+    conn = None
     try:
         conn = database.get_db_connection()
         if conn:
             cursor = conn.cursor()
-            
-            # Get last tweet with validated table name
-            safe_table = get_safe_table_name()
-            if not safe_table:
-                return {}
-                
+
             cursor.execute(f"SELECT tweet_text, created_at FROM {safe_table} ORDER BY created_at DESC LIMIT 1")
             last_tweet = cursor.fetchone()
 
@@ -1031,18 +1030,18 @@ def update_stats():
                 bot_stats["last_tweet"] = last_tweet[0]
                 # Convert UTC to local time for display
                 try:
-                    from datetime import datetime
-                    import datetime as dt
-                    from config import get_int_config
-
                     utc_time = datetime.strptime(last_tweet[1], "%Y-%m-%d %H:%M:%S")
                     # Get timezone offset from config (default: UTC+3 for Turkey)
                     tz_offset = get_int_config("TIMEZONE_OFFSET", 3)
-                    local_time = utc_time + dt.timedelta(hours=tz_offset)
+                    local_time = utc_time + timedelta(hours=tz_offset)
                     bot_stats["last_tweet_time"] = local_time.strftime("%Y-%m-%d %H:%M:%S")
-                except:
+                except ValueError:
                     bot_stats["last_tweet_time"] = last_tweet[1]
-            
+            else:
+                # Table is empty (for example after clearing the database)
+                bot_stats["last_tweet"] = None
+                bot_stats["last_tweet_time"] = None
+
             # Get daily and total tweets count in single optimized query
             today = datetime.now().strftime("%Y-%m-%d")
             cursor.execute(f"""
@@ -1054,12 +1053,12 @@ def update_stats():
             
             stats_result = cursor.fetchone()
             bot_stats["total_tweets"] = stats_result[0]
-            bot_stats["daily_tweets"] = stats_result[1]
-            
-            cursor.close()
-            conn.close()
+            bot_stats["daily_tweets"] = stats_result[1] or 0  # SUM is NULL on an empty table
     except Exception as e:
         print(f"Stats update error: {e}")
+    finally:
+        if conn:
+            conn.close()
 
 def get_tweets_from_db(page, per_page, filter_type='all'):
     """Get paginated tweets from database with filtering"""
