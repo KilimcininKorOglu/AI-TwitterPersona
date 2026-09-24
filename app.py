@@ -1206,8 +1206,6 @@ def run_bot_thread(stop_event):
         import random
         from config import get_int_config
 
-        CYCLE_DURATION_MINUTES = get_int_config("CYCLE_DURATION_MINUTES", 30)
-
         # Initialize bot modules first
         if hasattr(main, 'initialize_bot_modules'):
             if not main.initialize_bot_modules():
@@ -1297,11 +1295,13 @@ def run_bot_thread(stop_event):
                 # Update stats
                 bot_stats["last_check"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-                # Sleep with interruptible wait
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] Sleeping for {CYCLE_DURATION_MINUTES} minutes...")
-                broadcast_console_log('INFO', f'Next tweet in {CYCLE_DURATION_MINUTES} minutes')
+                # Sleep with interruptible wait; read the cycle length each time so
+                # a value saved from the settings page applies to the next cycle
+                cycle_minutes = main.get_cycle_duration_minutes()
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Sleeping for {cycle_minutes} minutes...")
+                broadcast_console_log('INFO', f'Next tweet in {cycle_minutes} minutes')
 
-                if stop_event.wait(timeout=CYCLE_DURATION_MINUTES * 60):
+                if stop_event.wait(timeout=cycle_minutes * 60):
                     break  # Event was set during wait, exit loop
 
             except Exception as cycle_error:

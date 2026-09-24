@@ -52,17 +52,22 @@ def initialize_bot_modules():
 # Configuration loaded via centralized config module
 
 # Bot Configuration - All values are customizable via environment variables with validation
-TRENDS_LIMIT = get_int_config("TRENDS_LIMIT", 3)  # Number of trending topics to fetch (default: 3)
-if TRENDS_LIMIT <= 0:
-    TRENDS_LIMIT = 3
-    print("[!] Warning: TRENDS_LIMIT must be positive, using default: 3")
+# Settings are read on every use so changes saved from the dashboard reach a running bot
+def get_trends_limit():
+    """Number of trending topics to fetch (default: 3)."""
+    limit = get_int_config("TRENDS_LIMIT", 3)
+    if limit <= 0:
+        print("[!] Warning: TRENDS_LIMIT must be positive, using default: 3")
+        return 3
+    return limit
 
-SLEEP_HOURS = get_sleep_hours()  # Hours when bot posts a general tweet instead of trends
-
-CYCLE_DURATION_MINUTES = get_int_config("CYCLE_DURATION_MINUTES", 60)  # Sleep time between tweet cycles
-if CYCLE_DURATION_MINUTES <= 0:
-    CYCLE_DURATION_MINUTES = 60
-    print("[!] Warning: CYCLE_DURATION_MINUTES must be positive, using default: 60")
+def get_cycle_duration_minutes(default=60):
+    """Sleep time between tweet cycles in minutes."""
+    minutes = get_int_config("CYCLE_DURATION_MINUTES", default)
+    if minutes <= 0:
+        print(f"[!] Warning: CYCLE_DURATION_MINUTES must be positive, using default: {default}")
+        return default
+    return minutes
 
 # Delays before retrying after a failed cycle, matching the dashboard bot thread
 RETRY_DELAY_SECONDS = 60
@@ -177,7 +182,7 @@ def isTrendingTime():
     """
     hour = dt.datetime.now().hour
     # Don't post during configured sleep hours (1,3,9,10 by default)
-    if hour in SLEEP_HOURS:
+    if hour in get_sleep_hours():
         return False
     return True
 
@@ -188,7 +193,7 @@ def trending_tweets():
     Returns:
         list or None: Selected trending topic as list, or None if error/no topics
     """
-    limit = TRENDS_LIMIT  # Use configured limit for trending topics
+    limit = get_trends_limit()  # Use configured limit for trending topics
     try:
         # Fetch trending topics from Turkey using trend module
         trend_tweet = trend.prepareTrend(limit=limit)
@@ -222,7 +227,7 @@ def run_bot():
     5. Sleep for configured duration before next cycle
     """
     print(f"[+] Bot starting at {dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"[+] Configuration: CYCLE_DURATION={CYCLE_DURATION_MINUTES} min, SLEEP_HOURS={SLEEP_HOURS}")
+    print(f"[+] Configuration: CYCLE_DURATION={get_cycle_duration_minutes()} min, SLEEP_HOURS={get_sleep_hours()}")
 
     # Initialize bot modules
     if not initialize_bot_modules():
@@ -286,10 +291,11 @@ def run_bot():
                     continue
                 
                 # Successfully posted - begin sleep cycle
-                print(f"[+] Bot Cycle Complete. Sleeping for {CYCLE_DURATION_MINUTES} minutes... ---\n")
-                
+                cycle_minutes = get_cycle_duration_minutes()
+                print(f"[+] Bot Cycle Complete. Sleeping for {cycle_minutes} minutes... ---\n")
+
                 # Convert minutes to seconds for sleep timer
-                timer = 60 * CYCLE_DURATION_MINUTES
+                timer = 60 * cycle_minutes
                 
                 # Countdown timer with live display
                 for i in range(timer + 1):

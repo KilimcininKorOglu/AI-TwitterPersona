@@ -42,40 +42,34 @@ def safe_int_config(key, default_value, min_val=None, max_val=None):
         print(f"[ERROR] Invalid {key} value: {e}. Using default: {default_value}")
         return default_value
 
-# AI Model Configuration - all parameters customizable via environment variables with safe parsing
-GEMINI_MODEL = get_config("GEMINI_MODEL", "gemini-2.5-flash")          # AI model version
-AI_TEMPERATURE = safe_float_config("AI_TEMPERATURE", 0.85, 0.0, 2.0)  # Creativity level (0.0-2.0)
-AI_TOP_P = safe_float_config("AI_TOP_P", 0.9, 0.0, 1.0)              # Nucleus sampling parameter (0.0-1.0)
-AI_TOP_K = safe_int_config("AI_TOP_K", 40, 1, 100)                    # Top-k sampling parameter (1-100)
+# AI Model Configuration - read on every use so settings saved from the dashboard
+# reach a running bot without a restart
+def get_ai_settings():
+    """Return the current Gemini model name and sampling parameters."""
+    return {
+        "model": get_config("GEMINI_MODEL", "gemini-2.5-flash"),          # AI model version
+        "temperature": safe_float_config("AI_TEMPERATURE", 0.85, 0.0, 2.0),  # Creativity level (0.0-2.0)
+        "top_p": safe_float_config("AI_TOP_P", 0.9, 0.0, 1.0),              # Nucleus sampling parameter (0.0-1.0)
+        "top_k": safe_int_config("AI_TOP_K", 40, 1, 100),                    # Top-k sampling parameter (1-100)
+    }
 
 # Startup configuration validation
 def validate_startup_config():
     """Validate all configuration values at startup"""
     issues = []
-    
+    settings = get_ai_settings()
+
     # Check model name
-    if not GEMINI_MODEL or not isinstance(GEMINI_MODEL, str):
-        issues.append(f"GEMINI_MODEL invalid: '{GEMINI_MODEL}'")
-    
-    # Validate temperature range
-    if not 0.0 <= AI_TEMPERATURE <= 2.0:
-        issues.append(f"AI_TEMPERATURE out of range: {AI_TEMPERATURE} (should be 0.0-2.0)")
-    
-    # Validate top_p range
-    if not 0.0 <= AI_TOP_P <= 1.0:
-        issues.append(f"AI_TOP_P out of range: {AI_TOP_P} (should be 0.0-1.0)")
-    
-    # Validate top_k range
-    if not 1 <= AI_TOP_K <= 100:
-        issues.append(f"AI_TOP_K out of range: {AI_TOP_K} (should be 1-100)")
-    
+    if not settings["model"] or not isinstance(settings["model"], str):
+        issues.append(f"GEMINI_MODEL invalid: '{settings['model']}'")
+
     if issues:
         print("[ERROR] Configuration validation failed:")
         for issue in issues:
             print(f"  - {issue}")
         return False
     else:
-        print(f"[+] Configuration validated: Model={GEMINI_MODEL}, Temperature={AI_TEMPERATURE}, TopP={AI_TOP_P}, TopK={AI_TOP_K}")
+        print(f"[+] Configuration validated: Model={settings['model']}, Temperature={settings['temperature']}, TopP={settings['top_p']}, TopK={settings['top_k']}")
         return True
 
 # Run startup validation
@@ -97,28 +91,30 @@ rate_limiter = QuotaBackoff()
 
 # Global variables for lazy initialization
 model = None
-gemini_api_key = None
+_model_key = None  # (api key, model name) the cached model was built with
 
 def initialize_gemini():
-    """Initialize Gemini AI with API key validation"""
-    global model, gemini_api_key
-    
-    if model is not None:
-        return True  # Already initialized
-    
+    """Initialize Gemini AI with API key validation; rebuild when the key or model changes"""
+    global model, _model_key
+
     # Validate Gemini API key
     gemini_api_key = get_config("gemini_api_key")
     if not gemini_api_key or gemini_api_key == "YOUR_GEMINI_API_KEY":
         logging.warning("Gemini API key not found or not configured")
         logging.info("Please get your API key from https://ai.google.dev/ and update token.env")
         return False
-    
+
+    model_name = get_ai_settings()["model"]
+    if model is not None and _model_key == (gemini_api_key, model_name):
+        return True  # Already initialized with the current settings
+
     try:
         # Configure Gemini AI with validated API key
         genai.configure(api_key=gemini_api_key)
-        
+
         # Initialize the Gemini AI model with configured settings
-        model = genai.GenerativeModel(GEMINI_MODEL)
+        model = genai.GenerativeModel(model_name)
+        _model_key = (gemini_api_key, model_name)
         return True
     except Exception as e:
         print(f"[!] Error initializing Gemini: {e}")
@@ -355,13 +351,14 @@ Hashtag: {hashtag}"""
         context_prompt = persona + "\nKonu: " + user_input
 
     # Generate tweet using persona prompt and topic, with configured AI parameters
+    settings = get_ai_settings()
     try:
         resp = convo.send_message(
             context_prompt,
             generation_config={
-                "temperature": AI_TEMPERATURE,     # Controls creativity/randomness
-                "top_p": AI_TOP_P,                # Nucleus sampling parameter
-                "top_k": AI_TOP_K,                # Top-k sampling parameter
+                "temperature": settings["temperature"],  # Controls creativity/randomness
+                "top_p": settings["top_p"],              # Nucleus sampling parameter
+                "top_k": settings["top_k"],              # Top-k sampling parameter
                 "max_output_tokens": None         # No limit on response length
             }
         )
