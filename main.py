@@ -264,10 +264,8 @@ def run_bot():
             prompt += f"Bunlar tweet detayları. [format- konu, tweet sayısı, tweet URL] {topic}. Tüm bu detayları tweet bilgin için kullan, referans için değil."
             
             # Add context for better AI understanding
-            context = " "  # Placeholder for user input (currently unused)
-            if not context:
-                context = "Kullanıcı tarafından ek bağlam eklenmedi. Konu detaylarını kullanarak bağlamı ve amacı anlamalısın. Tweet referansı için detayları kullan."
-            prompt += context + " " + str(topic)
+            context = "Kullanıcı tarafından ek bağlam eklenmedi. Konu detaylarını kullanarak bağlamı ve amacı anlamalısın. Tweet referansı için detayları kullan."
+            prompt += " " + context
             
         else:
             # Use general prompt when not in trending time

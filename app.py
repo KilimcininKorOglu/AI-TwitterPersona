@@ -1237,7 +1237,7 @@ def run_bot_thread():
                     # Create prompt for AI
                     prompt += f"Bunlar tweet detayları. [format- konu, tweet sayısı, tweet URL] {topic}. Tüm bu detayları tweet bilgin için kullan, referans için değil."
                     context = "Kullanıcı tarafından ek bağlam eklenmedi. Konu detaylarını kullanarak bağlamı ve amacı anlamalısın. Tweet referansı için detayları kullan."
-                    prompt += context + " " + str(topic)
+                    prompt += " " + context
                 else:
                     print(f"[{datetime.now().strftime('%H:%M:%S')}] Sleep hour - using general prompt")
                     broadcast_console_log('INFO', 'Sleep hour - using general prompt')
