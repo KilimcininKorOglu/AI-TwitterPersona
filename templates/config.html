@@ -44,30 +44,6 @@
                             <small>180dk</small>
                         </div>
                     </div>
-                    
-                    <!-- Night Mode -->
-                    <div class="row">
-                        <div class="col-6">
-                            <label for="night-start" class="form-label">Gece Modu Başlangıç</label>
-                            <select class="form-select" id="night-start" name="night_mode_start">
-                                {% for hour in range(24) %}
-                                <option value="{{ hour }}" {% if hour == config.night_mode_start %}selected{% endif %}>
-                                    {{ "%02d:00"|format(hour) }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-6">
-                            <label for="night-end" class="form-label">Gece Modu Bitiş</label>
-                            <select class="form-select" id="night-end" name="night_mode_end">
-                                {% for hour in range(24) %}
-                                <option value="{{ hour }}" {% if hour == config.night_mode_end %}selected{% endif %}>
-                                    {{ "%02d:00"|format(hour) }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                    </div>
                 </form>
             </div>
         </div>
@@ -410,8 +386,6 @@
             const config = {
                 sleep_hours: Array.from(document.querySelectorAll('input[name="sleep_hours"]:checked')).map(cb => parseInt(cb.value)),
                 cycle_duration: parseInt(document.getElementById('cycle-duration').value),
-                night_mode_start: parseInt(document.getElementById('night-start').value),
-                night_mode_end: parseInt(document.getElementById('night-end').value),
                 trends_limit: parseInt(document.getElementById('trends-limit').value),
                 trend_country: document.getElementById('trend-country').value,
                 ai_model: document.getElementById('ai-model').value,

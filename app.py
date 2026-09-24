@@ -1163,8 +1163,6 @@ def get_current_config():
         "trends_limit": get_int_config("TRENDS_LIMIT", 3),
         "sleep_hours": sleep_hours,
         "cycle_duration": get_int_config("CYCLE_DURATION_MINUTES", 60),
-        "night_mode_start": get_int_config("NIGHT_MODE_START", 1),
-        "night_mode_end": get_int_config("NIGHT_MODE_END", 6),
         "trend_country": trend_country,
         "ai_temperature": float(get_config("AI_TEMPERATURE", "0.85")),
         "ai_model": get_config("GEMINI_MODEL", "gemini-2.5-flash"),
@@ -1176,37 +1174,6 @@ def get_current_config():
         "bearer_token": get_config("bearer_token", ""),
         "user_id": get_config("USER_ID", ""),
         "gemini_api_key": get_config("gemini_api_key", "")
-    }
-
-def get_current_config_old():
-    """Old implementation - kept for reference"""
-    print(f"DEBUG: API_MODULES_LOADED = {API_MODULES_LOADED}")  # Debug
-    if not API_MODULES_LOADED:
-        # Reload environment variables to get latest values
-        reload_config()
-        
-        # Return configuration from centralized config
-        trends_limit_val = get_config("TRENDS_LIMIT", "3")
-        trends_limit_int = int(trends_limit_val)
-        print(f"DEBUG: TRENDS_LIMIT from env = '{trends_limit_val}' -> int = {trends_limit_int}")  # Debug
-        return {
-            "trends_limit": trends_limit_int,
-            "sleep_hours": get_config("SLEEP_HOURS", "1,3,9,10").split(","),
-            "cycle_duration": get_int_config("CYCLE_DURATION_MINUTES", 60),
-            "night_mode_start": get_int_config("NIGHT_MODE_START", 1),
-            "night_mode_end": get_int_config("NIGHT_MODE_END", 6),
-            "ai_temperature": float(get_config("AI_TEMPERATURE", "0.85")),
-            "ai_model": get_config("GEMINI_MODEL", "gemini-2.5-flash")
-        }
-    
-    return {
-        "trends_limit": main.TRENDS_LIMIT,
-        "sleep_hours": main.SLEEP_HOURS,
-        "cycle_duration": main.CYCLE_DURATION_MINUTES,
-        "night_mode_start": main.NIGHT_MODE_START,
-        "night_mode_end": main.NIGHT_MODE_END,
-        "ai_temperature": reply.AI_TEMPERATURE,
-        "ai_model": reply.GEMINI_MODEL
     }
 
 def get_current_trends():
@@ -1423,18 +1390,6 @@ def validate_config_value(key, value):
             'min': 1,
             'max': 1440,  # Max 24 hours
             'description': 'Cycle duration in minutes'
-        },
-        'night_mode_start': {
-            'type': int,
-            'min': 0,
-            'max': 23,
-            'description': 'Night mode start hour'
-        },
-        'night_mode_end': {
-            'type': int,
-            'min': 0, 
-            'max': 23,
-            'description': 'Night mode end hour'
         },
         'ai_temperature': {
             'type': float,
@@ -1655,8 +1610,6 @@ def update_token_env(new_config):
             'sleep_hours': 'SLEEP_HOURS',
             'trends_limit': 'TRENDS_LIMIT',
             'cycle_duration': 'CYCLE_DURATION_MINUTES',
-            'night_mode_start': 'NIGHT_MODE_START',
-            'night_mode_end': 'NIGHT_MODE_END',
             'trend_country': 'TRENDS_URL',
             'ai_temperature': 'AI_TEMPERATURE',
             'ai_model': 'GEMINI_MODEL',

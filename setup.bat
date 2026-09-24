@@ -64,8 +64,6 @@ if not exist "token.env" (
     echo # Bot Configuration >> token.env
     echo TRENDS_LIMIT=3 >> token.env
     echo SLEEP_HOURS=1,3,9,10 >> token.env
-    echo NIGHT_MODE_START=1 >> token.env
-    echo NIGHT_MODE_END=6 >> token.env
     echo CYCLE_DURATION_MINUTES=60 >> token.env
     echo TRENDS_URL=https://xtrends.iamrohit.in/turkey >> token.env
     echo GEMINI_MODEL=gemini-2.5-flash >> token.env

@@ -69,17 +69,6 @@ except ValueError:
     SLEEP_HOURS = [1, 3, 9, 10]
     print("[!] Warning: Invalid SLEEP_HOURS format, using default: [1,3,9,10]")
 
-NIGHT_MODE_START = get_int_config("NIGHT_MODE_START", 1)  # Start of night mode (inactive period)
-if not 0 <= NIGHT_MODE_START <= 23:
-    NIGHT_MODE_START = 1
-    print("[!] Warning: NIGHT_MODE_START must be 0-23, using default: 1")
-    print("[!] Warning: Invalid NIGHT_MODE_START value, using default: 1")
-
-NIGHT_MODE_END = get_int_config("NIGHT_MODE_END", 6)      # End of night mode
-if not 0 <= NIGHT_MODE_END <= 23:
-    NIGHT_MODE_END = 6
-    print("[!] Warning: NIGHT_MODE_END must be 0-23, using default: 6")
-
 CYCLE_DURATION_MINUTES = get_int_config("CYCLE_DURATION_MINUTES", 60)  # Sleep time between tweet cycles
 if CYCLE_DURATION_MINUTES <= 0:
     CYCLE_DURATION_MINUTES = 60
@@ -192,21 +181,6 @@ def scheduled_tweet(tweets):
                 break
                 
     return STATUS
-
-def getStatus():
-    """
-    Check if the bot should be active based on night mode settings.
-    NOTE: This function is currently unused in the main bot loop.
-    
-    Returns:
-        bool: True if bot should be active, False during night mode hours
-    """
-    hour = dt.datetime.now().hour
-    # Return False during night mode hours (1-6 AM by default)
-    if hour >= NIGHT_MODE_START and hour <= NIGHT_MODE_END:
-        return False
-    else:
-        return True
 
 def isTrendingTime():
     """
