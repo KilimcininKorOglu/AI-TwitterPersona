@@ -2048,6 +2048,42 @@ def api_export_database():
             'message': f'Export error: {str(e)}'
         }), 500
 
+def import_tweet_rows(conn, tweets):
+    """
+    Insert backup rows that are not already present.
+
+    IDs from another database say nothing about local rows, so duplicates are
+    detected by (tweet_text, created_at) instead.
+
+    Returns:
+        tuple: (imported_count, skipped_count)
+    """
+    existing = set(conn.execute("SELECT tweet_text, created_at FROM tweets").fetchall())
+    # Match the UTC "YYYY-MM-DD HH:MM:SS" format SQLite's CURRENT_TIMESTAMP produces
+    now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    imported_count = 0
+    skipped_count = 0
+    for tweet_data in tweets:
+        text = tweet_data.get('tweet_text', tweet_data.get('content', ''))
+        created_at = tweet_data.get('created_at') or now_utc
+        if (text, created_at) in existing:
+            skipped_count += 1
+            continue
+        sent = tweet_data.get('sent', tweet_data.get('status'))
+        conn.execute("""
+            INSERT INTO tweets (tweet_text, tweet_type, sent, created_at, persona)
+            VALUES (?, ?, ?, ?, ?)
+        """, (
+            text,
+            tweet_data.get('tweet_type', 'imported'),
+            1 if sent in (1, True, 'success') else 0,
+            created_at,
+            tweet_data.get('persona')
+        ))
+        existing.add((text, created_at))
+        imported_count += 1
+    return imported_count, skipped_count
+
 @app.route('/api/import/database', methods=['POST'])
 @login_required
 def api_import_database():
@@ -2062,36 +2098,12 @@ def api_import_database():
             }), 400
         
         conn = sqlite3.connect(database.dbName)
-        cursor = conn.cursor()
-        
-        # Get existing tweet IDs to avoid duplicates
-        cursor.execute("SELECT id FROM tweets")
-        existing_ids = set(row[0] for row in cursor.fetchall())
-        
-        imported_count = 0
-        skipped_count = 0
-        
-        # Import tweets
-        for tweet_data in import_data['tweets']:
-            if tweet_data.get('id') in existing_ids:
-                skipped_count += 1
-                continue
-            
-            # Insert tweet (let SQLite auto-generate ID if not provided)
-            cursor.execute("""
-                INSERT INTO tweets (tweet_text, tweet_type, sent, created_at)
-                VALUES (?, ?, ?, ?)
-            """, (
-                tweet_data.get('tweet_text', tweet_data.get('content', '')),
-                tweet_data.get('tweet_type', 'imported'),
-                1 if tweet_data.get('sent', tweet_data.get('status')) == 'success' or tweet_data.get('sent') == 1 else 0,
-                tweet_data.get('created_at', datetime.now().isoformat())
-            ))
-            imported_count += 1
-        
-        conn.commit()
-        conn.close()
-        
+        try:
+            with conn:  # Commit all rows together, roll back on error
+                imported_count, skipped_count = import_tweet_rows(conn, import_data['tweets'])
+        finally:
+            conn.close()
+
         return jsonify({
             'success': True,
             'message': f'Import tamamlandı: {imported_count} tweet eklendi, {skipped_count} tweet atlandı',
