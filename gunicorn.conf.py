@@ -1,6 +1,5 @@
 import os
-import multiprocessing
-from config import get_config, get_int_config  # Centralized configuration
+from config import get_config  # Centralized configuration
 
 # Server Socket
 bind = f"{get_config('WEB_HOST', '0.0.0.0')}:{get_config('WEB_PORT', '8080')}"

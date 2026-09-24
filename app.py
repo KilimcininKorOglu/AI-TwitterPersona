@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session, g
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
 from flask_socketio import SocketIO, emit
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from flask_wtf import FlaskForm, CSRFProtect
@@ -13,9 +13,8 @@ from config import get_config, get_int_config, get_bool_config, reload_config, g
 import sqlite3
 from datetime import datetime, timedelta, timezone
 import errno
-import json
+import importlib
 import math
-from functools import lru_cache
 import gc  # For memory management
 import logging
 import re  # For log sanitization
@@ -178,8 +177,7 @@ def validate_secret_key_strength(key):
 
 def generate_secure_secret_key():
     """Generate a cryptographically secure secret key"""
-    # Generate 64 random bytes and convert to URL-safe base64
-    random_bytes = secrets.token_bytes(64)
+    # Generate 64 random bytes as URL-safe base64
     secure_key = secrets.token_urlsafe(64)
     
     # Add timestamp hash for additional uniqueness
@@ -262,13 +260,12 @@ def tweets_table():
 # Conditional imports - only import if API keys are available
 reply = None
 trend = None
-twitter_client = None
 main = None
 
 try:
     import reply
     import trend
-    import twitter_client
+    importlib.import_module('twitter_client')  # Check that the Twitter module loads
     import main
     API_MODULES_LOADED = True
 except Exception as e:
@@ -589,7 +586,7 @@ def api_control():
                 # blocked in a network call keeps its set event and exits afterwards
                 bot_stop_event = threading.Event()
 
-                print(f"[INFO] Starting bot thread...")
+                print("[INFO] Starting bot thread...")
                 bot_thread = threading.Thread(target=run_bot_thread, args=(bot_stop_event,))
                 bot_thread.daemon = True
                 bot_thread.start()
@@ -607,7 +604,7 @@ def api_control():
             
         elif action == 'stop' and bot_running:
             try:
-                print(f"[INFO] Stopping bot thread...")
+                print("[INFO] Stopping bot thread...")
                 bot_running = False
                 # Signal the thread; it exits at its next stop-event check. The event
                 # stays set so a thread blocked in a long call still stops afterwards.
@@ -948,8 +945,8 @@ def api_config():
 @login_required
 def api_emergency_stop():
     """Emergency stop - kill all bot processes immediately"""
-    global bot_running, bot_thread
-    
+    global bot_running
+
     try:
         with bot_lock:
             bot_running = False
@@ -1053,7 +1050,6 @@ def sqlite_tz_modifier():
 
 def update_stats():
     """Update bot statistics from database"""
-    global bot_stats
     safe_table = get_safe_table_name()
     if not safe_table:
         return
@@ -1229,11 +1225,6 @@ def run_bot_thread(stop_event):
         return
 
     try:
-        # Import required modules
-        import time
-        import random
-        from config import get_int_config
-
         # Initialize bot modules first
         if hasattr(main, 'initialize_bot_modules'):
             if not main.initialize_bot_modules():
@@ -1981,7 +1972,6 @@ def api_analytics_trending_topics():
                 words = content.lower().split()
                 for word in words:
                     # Clean word (remove punctuation)
-                    import re
                     clean_word = re.sub(r'[^\w\sğüşıöçĞÜŞİÖÇ]', '', word)
                     if len(clean_word) > 3 and not clean_word.startswith('http'):
                         word_frequency[clean_word] = word_frequency.get(clean_word, 0) + 1
@@ -2742,9 +2732,9 @@ def sanitize_input(text):
     return text.strip()
 
 if __name__ == '__main__':
-    print(f"Starting AI-TwitterPersona Web Dashboard...")
+    print("Starting AI-TwitterPersona Web Dashboard...")
     print(f"Dashboard will be available at: http://{WEB_HOST}:{WEB_PORT}")
-    print(f"Real-time updates enabled via WebSocket")
+    print("Real-time updates enabled via WebSocket")
     
     # Run Flask-SocketIO development server
     socketio.run(app, host=WEB_HOST, port=WEB_PORT, debug=WEB_DEBUG)

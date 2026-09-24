@@ -3,7 +3,6 @@ Check real-time API connection status
 """
 
 import time
-import os
 from dotenv import load_dotenv
 import tweepy
 import google.generativeai as genai

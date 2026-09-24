@@ -1,6 +1,5 @@
 import sqlite3          # Built-in SQLite database interface
 import datetime as dt   # For timestamp generation
-import os              # For environment variable access
 import threading       # For thread-safe database operations
 import string          # For prompt template placeholder parsing
 from config import get_config  # Centralized configuration
@@ -217,7 +216,7 @@ Maksimum {max_tweet_length} karakter. Tek tweet.""",
             print("[+] Default AI persona prompts inserted into database")
         
         db.commit()  # Save all changes
-        print(f"[+] Prompts table created and initialized")
+        print("[+] Prompts table created and initialized")
         
     except Exception as e:
         print(f"Error : {e}")
@@ -270,7 +269,7 @@ def save_tweets(tweet, tweet_type, status, persona=None):
             # Execute query with parameterized values (prevents SQL injection)
             cursor.execute(query, values)
             db.commit()  # Save changes to database
-            print(f"[+] Tweet saved in Database.")
+            print("[+] Tweet saved in Database.")
             
         except Exception as e:
             # Handle any database operation errors

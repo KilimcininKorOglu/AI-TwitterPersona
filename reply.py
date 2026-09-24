@@ -138,7 +138,7 @@ if os.path.exists(CACHE_FILENAME):
         topic_cache = {}  # Initialize empty cache on error
 else:
     topic_cache = {}  # Initialize empty cache if file doesn't exist
-    print(f"[INFO] No existing cache file found, starting with empty cache")
+    print("[INFO] No existing cache file found, starting with empty cache")
 
 # Dynamic AI Persona System - All prompts are stored in database
 # This allows web-based editing and complete customization of persona
@@ -331,7 +331,7 @@ def generate_reply_with_persona(user_input):
     # Use database prompts only - if database fails, don't generate tweet
     if not active_prompts or topic not in active_prompts:
         print(f"[!] Error: No prompt found for '{topic}' persona in database")
-        print(f"[!] Please configure prompts via web interface at /prompts")
+        print("[!] Please configure prompts via web interface at /prompts")
         return "", topic  # Empty string indicates failure
 
     print(f"[+] Using database prompt for '{topic}' persona")

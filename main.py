@@ -1,7 +1,6 @@
 import time              # For sleep functionality and timing controls
 import datetime as dt    # For current time checks and scheduling
 import random           # For random topic selection from trending list
-import os               # For environment variable access
 import requests         # For HTTP requests (used in error handling)
 from config import get_int_config, get_config, get_sleep_hours  # Centralized configuration
 import logging  # For secure logging
@@ -246,7 +245,7 @@ def run_bot():
         
         # Check if current time allows trending topic posting
         if isTrendingTime():
-            print(f"[+] Getting Trending Topics...")
+            print("[+] Getting Trending Topics...")
             
             # Fetch trending topics from Turkey
             topic = trending_tweets()
