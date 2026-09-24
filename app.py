@@ -53,38 +53,44 @@ def sanitize_for_logging(data):
     Returns sanitized string safe for logging
     """
     if isinstance(data, dict):
-        sensitive_keys = [
-            'api_key', 'api_secret', 'access_token', 'access_token_secret', 
-            'bearer_token', 'gemini_api_key', 'password', 'secret', 'token'
-        ]
-        sanitized = {}
-        for key, value in data.items():
-            if any(sensitive_key in key.lower() for sensitive_key in sensitive_keys):
-                if value:
-                    sanitized[key] = f"***{value[-4:] if len(str(value)) > 4 else '****'}***"
-                else:
-                    sanitized[key] = "***empty***"
-            else:
-                sanitized[key] = value
-        return sanitized
-    elif isinstance(data, (list, tuple)):
+        return sanitize_dict_for_logging(data)
+    if isinstance(data, (list, tuple)):
         return [sanitize_for_logging(item) for item in data]
-    elif isinstance(data, str):
-        # Sanitize known sensitive patterns
-        patterns = [
-            (r'(api_key|secret|token|password)[=:]\s*[^\s,}]+', r'\1=***REDACTED***'),
-            (r'Bearer\s+[A-Za-z0-9_%-]+', r'Bearer ***REDACTED***'),
-            (r'[A-Za-z0-9_-]{20,}', lambda m: f"***{m.group()[-4:]}***" if len(m.group()) > 10 else "***REDACTED***")
-        ]
-        sanitized = data
-        for pattern, replacement in patterns:
-            if callable(replacement):
-                sanitized = re.sub(pattern, replacement, sanitized)
-            else:
-                sanitized = re.sub(pattern, replacement, sanitized)
-        return sanitized
-    else:
-        return data
+    if isinstance(data, str):
+        return sanitize_text_for_logging(data)
+    return data
+
+SENSITIVE_LOG_KEYS = [
+    'api_key', 'api_secret', 'access_token', 'access_token_secret',
+    'bearer_token', 'gemini_api_key', 'password', 'secret', 'token'
+]
+
+# Patterns applied in order to free text before it is logged
+SENSITIVE_LOG_PATTERNS = [
+    (r'(api_key|secret|token|password)[=:]\s*[^\s,}]+', r'\1=***REDACTED***'),
+    (r'Bearer\s+[A-Za-z0-9_%-]+', r'Bearer ***REDACTED***'),
+    (r'[A-Za-z0-9_-]{20,}', lambda m: f"***{m.group()[-4:]}***" if len(m.group()) > 10 else "***REDACTED***")
+]
+
+def mask_secret_value(value):
+    """Mask a secret for logging, keeping at most its last 4 characters."""
+    if not value:
+        return "***empty***"
+    return f"***{value[-4:] if len(str(value)) > 4 else '****'}***"
+
+def sanitize_dict_for_logging(data):
+    """Mask the values of keys that look sensitive."""
+    sanitized = {}
+    for key, value in data.items():
+        is_sensitive = any(sensitive_key in key.lower() for sensitive_key in SENSITIVE_LOG_KEYS)
+        sanitized[key] = mask_secret_value(value) if is_sensitive else value
+    return sanitized
+
+def sanitize_text_for_logging(text):
+    """Redact known sensitive patterns in free text."""
+    for pattern, replacement in SENSITIVE_LOG_PATTERNS:
+        text = re.sub(pattern, replacement, text)
+    return text
 
 def secure_log(level, message, data=None):
     """
