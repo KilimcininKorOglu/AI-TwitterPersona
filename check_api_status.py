@@ -57,8 +57,8 @@ def check_gemini_api():
         # Configure Gemini
         genai.configure(api_key=gemini_api_key)
 
-        # Test with a simple prompt
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        # Test with a simple prompt on the model the bot actually uses
+        model = genai.GenerativeModel(get_config("GEMINI_MODEL", "gemini-2.5-flash"))
         response = model.generate_content("Test")
 
         if response:
