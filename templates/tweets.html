@@ -120,21 +120,23 @@
                         <ul class="pagination justify-content-center">
                             {% if page > 1 %}
                             <li class="page-item">
-                                <a class="page-link" href="{{ url_for('tweets_history', page=page-1) }}">
+                                <a class="page-link" href="{{ url_for('tweets_history', page=page-1, filter=filter_type) }}">
                                     <i class="fas fa-chevron-left"></i> Önceki
                                 </a>
                             </li>
                             {% endif %}
-                            
+
                             <li class="page-item active">
-                                <span class="page-link">{{ page }}</span>
+                                <span class="page-link">{{ page }} / {{ total_pages }}</span>
                             </li>
-                            
+
+                            {% if page < total_pages %}
                             <li class="page-item">
-                                <a class="page-link" href="{{ url_for('tweets_history', page=page+1) }}">
+                                <a class="page-link" href="{{ url_for('tweets_history', page=page+1, filter=filter_type) }}">
                                     Sonraki <i class="fas fa-chevron-right"></i>
                                 </a>
                             </li>
+                            {% endif %}
                         </ul>
                     </nav>
                 {% else %}
