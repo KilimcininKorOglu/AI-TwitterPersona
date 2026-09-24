@@ -229,6 +229,9 @@ def run_bot():
     print(f"[+] Bot starting at {dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"[+] Configuration: CYCLE_DURATION={get_cycle_duration_minutes()} min, SLEEP_HOURS={get_sleep_hours()}")
 
+    # Create or migrate the database schema before the first save
+    database.createDatabase()
+
     # Initialize bot modules
     if not initialize_bot_modules():
         print("[!] Error: Could not initialize bot modules")

@@ -26,6 +26,9 @@ import database
 from database import validate_table_name
 import tweet_length as tweet_length_rules
 
+# Create or migrate the schema on import: gunicorn loads app:app and never runs __main__
+database.createDatabase()
+
 # Security-aware logging system
 def setup_secure_logging():
     """Setup secure logging with sanitization"""
@@ -2727,9 +2730,6 @@ def sanitize_input(text):
     return text.strip()
 
 if __name__ == '__main__':
-    # Initialize database
-    database.createDatabase()
-    
     print(f"Starting AI-TwitterPersona Web Dashboard...")
     print(f"Dashboard will be available at: http://{WEB_HOST}:{WEB_PORT}")
     print(f"Real-time updates enabled via WebSocket")
