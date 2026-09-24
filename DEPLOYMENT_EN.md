@@ -110,13 +110,19 @@ sudo systemctl reload nginx
 # Build image
 docker build -t ai-twitterpersona-dashboard .
 
-# Run container
+# token.env must exist and be writable by the container user (UID 1000),
+# because the settings page saves changes to it
+sudo chown 1000:1000 token.env
+
+# Run container (database and logs live in named volumes)
 docker run -d \
   --name ai-twitterpersona \
   -p 8080:8080 \
-  -v $(pwd)/token.env:/app/token.env:ro \
-  -v $(pwd)/logs:/app/logs \
-  -v $(pwd)/twitter.db:/app/twitter.db \
+  -e WEB_HOST=0.0.0.0 -e WEB_PORT=8080 \
+  -e DB_NAME=/app/data/twitter.db -e TOPIC_CACHE_FILE=/app/data/topic_cache.json \
+  -v $(pwd)/token.env:/app/token.env \
+  -v ai_twitterpersona_logs:/app/logs \
+  -v ai_twitterpersona_data:/app/data \
   --restart unless-stopped \
   ai-twitterpersona-dashboard
 ```
@@ -125,14 +131,18 @@ docker run -d \
 
 ```bash
 # Setup environment
-cp token.env.example token.env
+cp .env.example token.env
 nano token.env  # Add API keys and credentials
+sudo chown 1000:1000 token.env  # Writable by the container user
 
 # Start services
-docker-compose up -d
+docker compose up -d
+
+# Optional nginx reverse proxy (requires ./nginx.conf and ./ssl/)
+docker compose --profile nginx up -d
 
 # Check logs
-docker-compose logs -f ai-twitterpersona
+docker compose logs -f ai-twitterpersona
 ```
 
 ### 3. Cloud Deployment

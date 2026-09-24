@@ -125,7 +125,7 @@ def initialize_gemini():
         return False
 
 # Cache Configuration for topic classification optimization
-CACHE_FILENAME = "topic_cache.json"  # File to store topic classification results
+CACHE_FILENAME = get_config("TOPIC_CACHE_FILE", "topic_cache.json")  # File to store topic classification results
 
 # Load existing topic classification cache to avoid re-processing same topics
 if os.path.exists(CACHE_FILENAME):

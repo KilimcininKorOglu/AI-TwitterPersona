@@ -110,13 +110,19 @@ sudo systemctl reload nginx
 # Image build et
 docker build -t ai-twitterpersona-dashboard .
 
-# Container çalıştır
+# token.env mevcut olmalı ve container kullanıcısı (UID 1000) tarafından yazılabilir olmalı,
+# çünkü ayarlar sayfası değişiklikleri bu dosyaya kaydeder
+sudo chown 1000:1000 token.env
+
+# Container çalıştır (veritabanı ve loglar named volume içinde tutulur)
 docker run -d \
   --name ai-twitterpersona \
   -p 8080:8080 \
-  -v $(pwd)/token.env:/app/token.env:ro \
-  -v $(pwd)/logs:/app/logs \
-  -v $(pwd)/twitter.db:/app/twitter.db \
+  -e WEB_HOST=0.0.0.0 -e WEB_PORT=8080 \
+  -e DB_NAME=/app/data/twitter.db -e TOPIC_CACHE_FILE=/app/data/topic_cache.json \
+  -v $(pwd)/token.env:/app/token.env \
+  -v ai_twitterpersona_logs:/app/logs \
+  -v ai_twitterpersona_data:/app/data \
   --restart unless-stopped \
   ai-twitterpersona-dashboard
 ```
@@ -125,14 +131,18 @@ docker run -d \
 
 ```bash
 # Environment ayarla
-cp token.env.example token.env
+cp .env.example token.env
 nano token.env  # API keys ve credentials ekle
+sudo chown 1000:1000 token.env  # Container kullanıcısı yazabilsin
 
 # Servisleri başlat
-docker-compose up -d
+docker compose up -d
+
+# Opsiyonel nginx reverse proxy (./nginx.conf ve ./ssl/ gerekir)
+docker compose --profile nginx up -d
 
 # Logları kontrol et
-docker-compose logs -f ai-twitterpersona
+docker compose logs -f ai-twitterpersona
 ```
 
 ### 3. Cloud Deployment

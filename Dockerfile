@@ -17,8 +17,8 @@ RUN pip install gunicorn eventlet
 # Copy application files
 COPY . .
 
-# Create logs directory
-RUN mkdir -p logs
+# Create logs and data directories (named volumes copy their ownership)
+RUN mkdir -p logs data
 
 # Create non-root user
 RUN useradd -m -u 1000 ai-twitterpersona && chown -R ai-twitterpersona:ai-twitterpersona /app
