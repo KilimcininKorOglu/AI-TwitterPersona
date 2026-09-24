@@ -76,7 +76,8 @@ def mask_secret_value(value):
     """Mask a secret for logging, keeping at most its last 4 characters."""
     if not value:
         return "***empty***"
-    return f"***{value[-4:] if len(str(value)) > 4 else '****'}***"
+    text = str(value)  # Values such as numeric IDs are not strings
+    return f"***{text[-4:] if len(text) > 4 else '****'}***"
 
 def sanitize_dict_for_logging(data):
     """Mask the values of keys that look sensitive."""
