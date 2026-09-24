@@ -311,6 +311,24 @@ function displayPrompts(prompts) {
     });
 }
 
+// Return the error messages of failed API responses (HTTP error or success: false)
+async function collectFailures(responses) {
+    const failures = [];
+    for (const response of responses) {
+        let data = null;
+        try {
+            data = await response.json();
+        } catch (error) {
+            failures.push(`HTTP ${response.status}`);
+            continue;
+        }
+        if (!response.ok || !data.success) {
+            failures.push(data.message || `HTTP ${response.status}`);
+        }
+    }
+    return failures;
+}
+
 async function savePersonaSettings() {
     try {
         showLoading(true);
@@ -332,7 +350,11 @@ async function savePersonaSettings() {
             promises.push(promise);
         });
         
-        await Promise.all(promises);
+        const failures = await collectFailures(await Promise.all(promises));
+        if (failures.length > 0) {
+            showNotification('Persona ayarları kaydedilemedi: ' + failures.join('; '), 'error');
+            return;
+        }
         showNotification('Persona ayarları başarıyla kaydedildi!', 'success');
         
     } catch (error) {
@@ -380,7 +402,11 @@ async function saveAllPrompts() {
             }
         });
         
-        await Promise.all(promises);
+        const failures = await collectFailures(await Promise.all(promises));
+        if (failures.length > 0) {
+            showNotification('Prompt\'lar kaydedilemedi: ' + failures.join('; '), 'error');
+            return;
+        }
         showNotification('Tüm prompt\'lar başarıyla kaydedildi!', 'success');
         
     } catch (error) {
