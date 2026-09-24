@@ -191,59 +191,78 @@ def detect_topic_type(user_input):
     Returns:
         str: One of 'tech', 'casual', 'sad', or 'political' - defaults to 'casual' on any error
     """
-    # Extract hashtag from complex prompt if present
-    import re
-    hashtag_pattern = r'#[\w\u00C0-\u024F\u1E00-\u1EFF]+'
-    hashtag_match = re.search(hashtag_pattern, user_input)
-
-    if hashtag_match:
-        # Use only the hashtag for classification
-        topic_to_classify = hashtag_match.group(0)
+    # Use only the hashtag for classification when the prompt contains one
+    topic_to_classify = extract_hashtag(user_input) or user_input
+    if topic_to_classify != user_input:
         print(f"[+] Extracted hashtag for classification: {topic_to_classify}")
-    else:
-        # Use the original input if no hashtag found
-        topic_to_classify = user_input
 
     # Normalize input for consistent cache lookup
     normalized = topic_to_classify.strip().lower()
-    
+
     # Check cache first to avoid unnecessary API calls
-    if normalized in topic_cache:
-        cached_data = topic_cache[normalized]
-        # Handle both old string format and new dict format with timestamp
-        if isinstance(cached_data, str):
-            print(f"[+] Using cached classification (legacy): {user_input} -> {cached_data}")
-            return cached_data
-        elif isinstance(cached_data, dict) and 'category' in cached_data:
-            # Check if cache entry is still valid (less than 7 days old)
-            if 'timestamp' in cached_data:
-                from datetime import datetime, timedelta
-                try:
-                    entry_time = datetime.fromisoformat(cached_data['timestamp'])
-                    if datetime.now() - entry_time >= timedelta(days=7):
-                        print(f"[INFO] Cache entry expired for: {user_input}, re-classifying")
-                        del topic_cache[normalized]
-                    else:
-                        print(f"[+] Using cached classification: {user_input} -> {cached_data['category']}")
-                        return cached_data['category']
-                except:
-                    # If timestamp parsing fails, use cached value anyway
-                    print(f"[+] Using cached classification (timestamp error): {user_input} -> {cached_data['category']}")
-                    return cached_data['category']
-            else:
-                print(f"[+] Using cached classification (no timestamp): {user_input} -> {cached_data['category']}")
-                return cached_data['category']
-        else:
-            # Fallback for unknown format
-            category_fallback = str(cached_data)
-            print(f"[+] Using cached classification (fallback): {user_input} -> {category_fallback}")
-            return category_fallback
+    cached = cached_category(normalized, user_input)
+    if cached is not None:
+        return cached
 
     # Initialize Gemini if not already done
     if not initialize_gemini():
         print("[!] Cannot classify topic: Gemini API not initialized")
         return "casual"  # Default fallback
 
+    category, classified = classify_with_gemini(topic_to_classify)
+    if classified:
+        # Cache only real classifications; an error fallback must not pin a
+        # political topic to 'casual' for the whole cache lifetime
+        from datetime import datetime
+        topic_cache[normalized] = {
+            'category': category,
+            'timestamp': datetime.now().isoformat()
+        }
+        save_cache()  # Save cache to disk for persistence
+    return category
+
+def cached_category(normalized, user_input):
+    """
+    Return the cached category for a normalized topic, or None when it is missing or expired.
+
+    Handles the legacy string format and the dict format with a timestamp.
+    """
+    if normalized not in topic_cache:
+        return None
+    cached_data = topic_cache[normalized]
+    if isinstance(cached_data, str):
+        print(f"[+] Using cached classification (legacy): {user_input} -> {cached_data}")
+        return cached_data
+    if not (isinstance(cached_data, dict) and 'category' in cached_data):
+        # Fallback for unknown format
+        print(f"[+] Using cached classification (fallback): {user_input} -> {cached_data}")
+        return str(cached_data)
+    if 'timestamp' not in cached_data:
+        print(f"[+] Using cached classification (no timestamp): {user_input} -> {cached_data['category']}")
+        return cached_data['category']
+
+    from datetime import datetime, timedelta
+    try:
+        entry_time = datetime.fromisoformat(cached_data['timestamp'])
+    except (TypeError, ValueError):
+        # If timestamp parsing fails, use cached value anyway
+        print(f"[+] Using cached classification (timestamp error): {user_input} -> {cached_data['category']}")
+        return cached_data['category']
+    # Cache entries are valid for 7 days
+    if datetime.now() - entry_time >= timedelta(days=7):
+        print(f"[INFO] Cache entry expired for: {user_input}, re-classifying")
+        del topic_cache[normalized]
+        return None
+    print(f"[+] Using cached classification: {user_input} -> {cached_data['category']}")
+    return cached_data['category']
+
+def classify_with_gemini(topic_to_classify):
+    """
+    Ask Gemini for the topic category.
+
+    Returns:
+        tuple: (category, True) on a real classification, ('casual', False) on an error
+    """
     try:
         # Create classification prompt for Gemini AI
         prompt = f"""Aşağıdaki hashtag veya konuyu analiz et ve şu kategorilerden birine sınıflandır:
@@ -265,64 +284,15 @@ Sadece kategori adını döndür (political/tech/sad/casual)."""
         # Validate response and default to 'casual' if invalid
         if category not in ["tech", "casual", "sad", "political"]:
             category = "casual"
-            
-    except google.api_core.exceptions.InvalidArgument as e:
-        # Handle invalid API key or malformed request
-        print(f"[!] Gemini API error (Invalid API key or request): {e}")
-        category = "casual"
+        return category, True
+
     except google.api_core.exceptions.ResourceExhausted as e:
-        # Handle API quota exceeded errors with intelligent backoff
-        rate_limiter.record_failure()
-        print(f"[!] Gemini API quota exceeded: {e}")
-        
-        # Dynamic backoff based on failure count
-        backoff_time = min(2 ** rate_limiter.consecutive_failures * 60, 1800)  # Max 30 minutes
-        print(f"[!] Waiting {backoff_time//60} minutes for quota reset (failure #{rate_limiter.consecutive_failures})")
-        
-        time.sleep(backoff_time)
-        category = "casual"
-    except google.api_core.exceptions.PermissionDenied as e:
-        # Handle permission denied errors
-        logging.error(f"Gemini API permission denied: {str(e)}")
-        category = "casual"
-    except google.api_core.exceptions.NotFound as e:
-        # Handle model not found errors
-        logging.error(f"Gemini model not found: {str(e)}")
-        category = "casual"
-    except google.api_core.exceptions.DeadlineExceeded as e:
-        # Handle timeout errors
-        logging.error(f"Gemini API timeout: {str(e)}")
-        category = "casual"
-    except google.api_core.exceptions.ServiceUnavailable as e:
-        # Handle service unavailable errors
-        logging.error(f"Gemini service unavailable: {str(e)}")
-        category = "casual"
-    except requests.exceptions.ConnectionError as e:
-        # Handle network connection errors
-        logging.error(f"Network connection error: {str(e)}")
-        category = "casual"
-    except requests.exceptions.Timeout as e:
-        # Handle request timeout errors
-        logging.error(f"Request timeout error: {str(e)}")
-        category = "casual"
-    except json.JSONDecodeError as e:
-        # Handle JSON parsing errors in API response
-        logging.error(f"JSON decode error in API response: {str(e)}")
-        category = "casual"
+        # Handle API quota exceeded errors with backoff (max 30 minutes)
+        wait_for_quota(e, "topic classification", base_seconds=60, max_seconds=1800)
+        return "casual", False
     except Exception as e:
-        # Handle any other unexpected errors with full error details
-        logging.error(f"Unexpected topic classification error: {type(e).__name__}: {str(e)}")
-        category = "casual"
-    else:
-        # Cache only real classifications; an error fallback must not pin a
-        # political topic to 'casual' for the whole cache lifetime
-        from datetime import datetime
-        topic_cache[normalized] = {
-            'category': category,
-            'timestamp': datetime.now().isoformat()
-        }
-        save_cache()  # Save cache to disk for persistence
-    return category
+        log_gemini_error("topic classification", e)
+        return "casual", False
 
 def generate_reply(user_input):
     """
