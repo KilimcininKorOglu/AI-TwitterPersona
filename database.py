@@ -104,7 +104,8 @@ def createDatabase():
     db = get_db_connection()
     if db is None:
         return  # Exit if database connection failed
- 
+
+    cursor = None
     try:
         cursor = db.cursor()
         # SECURITY: Validate table name before using in SQL
@@ -215,7 +216,8 @@ Maksimum {max_tweet_length} karakter. Tek tweet.""",
         print(f"Error : {e}")
     finally:
         # Always close database connections to prevent locks
-        cursor.close()
+        if cursor is not None:
+            cursor.close()
         db.close()
 
 def save_tweets(tweet, tweet_type, status):
