@@ -1877,6 +1877,9 @@ def api_analytics_hourly_activity():
         for hour, count in results:
             hourly_data[hour] = count
         
+        # Scale colors by the busiest hour; use 1 when there are no tweets to avoid dividing by zero
+        max_count = max(hourly_data) or 1
+
         # Format data for Chart.js heatmap/bar chart
         data = {
             'labels': [f"{i:02d}:00" for i in range(24)],
@@ -1884,7 +1887,7 @@ def api_analytics_hourly_activity():
                 'label': 'Tweet Sayısı',
                 'data': hourly_data,
                 'backgroundColor': [
-                    f'rgba(29, 161, 242, {min(0.1 + (count / max(hourly_data or [1])) * 0.9, 1)})' 
+                    f'rgba(29, 161, 242, {min(0.1 + (count / max_count) * 0.9, 1)})'
                     for count in hourly_data
                 ],
                 'borderColor': 'rgba(29, 161, 242, 1)',
