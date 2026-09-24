@@ -2,6 +2,8 @@ from config import get_config, get_float_config, get_int_config  # Centralized c
 import os                          # For environment variable access
 import logging  # For secure logging
 import json                        # For cache file operations
+import time                        # For quota backoff sleeps
+import requests                    # For network exception types
 import google.generativeai as genai    # Google Gemini AI API
 import google.api_core.exceptions      # For specific Gemini API error handling
 import database                    # For database operations (avoid runtime import)
@@ -77,6 +79,20 @@ def validate_startup_config():
 
 # Run startup validation
 validate_startup_config()
+
+class QuotaBackoff:
+    """Track consecutive Gemini quota failures to scale the backoff delay."""
+
+    def __init__(self):
+        self.consecutive_failures = 0
+
+    def record_failure(self):
+        self.consecutive_failures += 1
+
+    def record_success(self):
+        self.consecutive_failures = 0
+
+rate_limiter = QuotaBackoff()
 
 # Global variables for lazy initialization
 model = None
@@ -208,6 +224,7 @@ Sadece kategori adını döndür (political/tech/sad/casual)."""
         # Get classification from Gemini AI
         resp = model.generate_content(prompt)
         category = resp.text.strip().lower()
+        rate_limiter.record_success()
         
         # Validate response and default to 'casual' if invalid
         if category not in ["tech", "casual", "sad", "political"]:
@@ -348,7 +365,9 @@ Hashtag: {hashtag}"""
         )
         
         # Return cleaned response text
-        return resp.text.strip()
+        text = resp.text.strip()
+        rate_limiter.record_success()
+        return text
         
     except google.api_core.exceptions.ResourceExhausted as e:
         # Handle API quota exceeded errors with dynamic backoff
@@ -411,9 +430,8 @@ def save_cache():
     Includes automatic cache expiration for entries older than 7 days.
     """
     try:
-        import time
         from datetime import datetime, timedelta
-        
+
         # Clean expired entries (older than 7 days)
         current_time = datetime.now()
         cleaned_cache = {}
