@@ -96,16 +96,15 @@ def check_database():
     """Check database connection status"""
     try:
         import sqlite3
-        from config import get_config
+        import database  # dbName and the whitelisted tableName
 
         start = time.time()
 
-        db_name = get_config("DB_NAME", "twitter.db")
-        conn = sqlite3.connect(db_name)
+        conn = sqlite3.connect(database.dbName)
 
-        # Test query
+        # Test query (tableName is validated against a whitelist in database.py)
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM tweets")
+        cursor.execute(f"SELECT COUNT(*) FROM {database.tableName}")
         result = cursor.fetchone()
 
         cursor.close()

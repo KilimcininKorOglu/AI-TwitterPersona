@@ -241,6 +241,18 @@ def get_safe_table_name():
         return None
     return database.tableName
 
+def tweets_table():
+    """
+    Return the configured tweets table name for SQL, raising if it is not whitelisted.
+
+    The name is checked against database.ALLOWED_TABLE_NAMES, so it is safe to
+    interpolate into queries.
+    """
+    safe_table = get_safe_table_name()
+    if not safe_table:
+        raise ValueError("Güvenlik hatası: Geçersiz tablo adı")
+    return safe_table
+
 # Conditional imports - only import if API keys are available
 reply = None
 trend = None
@@ -1742,7 +1754,7 @@ def api_analytics_success_rate():
         cursor = conn.cursor()
         
         # Get success rate data by day for last 30 days
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT
                 DATE(created_at, :tz) as date,
                 COUNT(*) as total_tweets,
@@ -1750,7 +1762,7 @@ def api_analytics_success_rate():
                 ROUND(
                     (SUM(CASE WHEN sent = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*)), 2
                 ) as success_rate
-            FROM tweets
+            FROM {tweets_table()}
             WHERE created_at >= datetime('now', '-30 days')
             GROUP BY DATE(created_at, :tz)
             ORDER BY date DESC
@@ -1794,12 +1806,12 @@ def api_analytics_personas():
         cursor = conn.cursor()
         
         # Get persona usage counts; the percentage uses the same 30-day window as the counts
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT
                 persona,
                 COUNT(*) as count,
                 ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) as percentage
-            FROM tweets
+            FROM {tweets_table()}
             WHERE created_at >= datetime('now', '-30 days')
             AND persona IS NOT NULL
             GROUP BY persona
@@ -1866,11 +1878,11 @@ def api_analytics_hourly_activity():
         cursor = conn.cursor()
         
         # Get tweet counts by local hour for last 7 days (created_at is UTC)
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT
                 CAST(strftime('%H', created_at, ?) AS INTEGER) as hour,
                 COUNT(*) as tweet_count
-            FROM tweets
+            FROM {tweets_table()}
             WHERE created_at >= datetime('now', '-7 days')
             GROUP BY hour
             ORDER BY hour
@@ -1927,9 +1939,9 @@ def api_analytics_trending_topics():
         
         # Get recent sent tweets; word frequencies are counted below. (An aggregate
         # without GROUP BY returned a single arbitrary row.)
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT tweet_text
-            FROM tweets
+            FROM {tweets_table()}
             WHERE created_at >= datetime('now', '-30 days')
             AND sent = 1
             ORDER BY created_at DESC
@@ -2006,15 +2018,16 @@ def api_analytics_trending_topics():
 def api_export_database():
     """Export complete database to JSON"""
     try:
+        table = tweets_table()
         conn = sqlite3.connect(database.dbName)
         cursor = conn.cursor()
-        
+
         # Export tweets table
-        cursor.execute("SELECT * FROM tweets")
+        cursor.execute(f"SELECT * FROM {table}")
         tweets = cursor.fetchall()
-        
+
         # Get column names
-        cursor.execute("PRAGMA table_info(tweets)")
+        cursor.execute(f"PRAGMA table_info({table})")
         columns = [row[1] for row in cursor.fetchall()]
         
         conn.close()
@@ -2035,7 +2048,7 @@ def api_export_database():
             'tweets': tweets_data,
             'configuration': {
                 'database_file': database.dbName,
-                'table_name': 'tweets'
+                'table_name': table
             }
         }
         
@@ -2061,7 +2074,8 @@ def import_tweet_rows(conn, tweets):
     Returns:
         tuple: (imported_count, skipped_count)
     """
-    existing = set(conn.execute("SELECT tweet_text, created_at FROM tweets").fetchall())
+    table = tweets_table()
+    existing = set(conn.execute(f"SELECT tweet_text, created_at FROM {table}").fetchall())
     # Match the UTC "YYYY-MM-DD HH:MM:SS" format SQLite's CURRENT_TIMESTAMP produces
     now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     imported_count = 0
@@ -2073,8 +2087,8 @@ def import_tweet_rows(conn, tweets):
             skipped_count += 1
             continue
         sent = tweet_data.get('sent', tweet_data.get('status'))
-        conn.execute("""
-            INSERT INTO tweets (tweet_text, tweet_type, sent, created_at, persona)
+        conn.execute(f"""
+            INSERT INTO {table} (tweet_text, tweet_type, sent, created_at, persona)
             VALUES (?, ?, ?, ?, ?)
         """, (
             text,
@@ -2323,18 +2337,19 @@ def get_realtime_stats():
         from datetime import datetime, timedelta
 
         stats = {}
+        table = tweets_table()
 
         # Get success rate from database
         conn = sqlite3.connect(database.dbName)
         cursor = conn.cursor()
 
         # Calculate success rate from last 100 tweets
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT
                 COUNT(*) as total,
                 SUM(CASE WHEN sent = 1 THEN 1 ELSE 0 END) as successful
             FROM (
-                SELECT sent FROM tweets
+                SELECT sent FROM {table}
                 ORDER BY created_at DESC
                 LIMIT 100
             )
@@ -2347,8 +2362,8 @@ def get_realtime_stats():
 
         # Count API calls today in the configured local timezone (created_at is UTC
         # text "YYYY-MM-DD HH:MM:SS", so compare dates, not ISO strings with a "T")
-        cursor.execute("""
-            SELECT COUNT(*) FROM tweets
+        cursor.execute(f"""
+            SELECT COUNT(*) FROM {table}
             WHERE DATE(created_at, ?) = ?
         """, (sqlite_tz_modifier(), local_now().strftime("%Y-%m-%d")))
         stats['api_calls'] = cursor.fetchone()[0]
@@ -2373,7 +2388,7 @@ def get_realtime_stats():
             # Find last tweet time
             conn = sqlite3.connect(database.dbName)
             cursor = conn.cursor()
-            cursor.execute("SELECT created_at FROM tweets WHERE sent = 1 ORDER BY created_at DESC LIMIT 1")
+            cursor.execute(f"SELECT created_at FROM {table} WHERE sent = 1 ORDER BY created_at DESC LIMIT 1")
             last_tweet = cursor.fetchone()
             cursor.close()
             conn.close()
@@ -2422,9 +2437,9 @@ def get_recent_activity():
         cursor = conn.cursor()
         
         # Get last 5 tweets with their details
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT tweet_text, tweet_type, sent, created_at, tweet_time
-            FROM tweets 
+            FROM {tweets_table()}
             ORDER BY id DESC 
             LIMIT 5
         """)
@@ -2511,7 +2526,7 @@ def get_database_stats():
         # Get total tweet count
         conn = sqlite3.connect(database.dbName)
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM tweets")
+        cursor.execute(f"SELECT COUNT(*) FROM {tweets_table()}")
         total_tweets = cursor.fetchone()[0]
         conn.close()
         
