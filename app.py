@@ -1384,217 +1384,212 @@ def broadcast_console_log(log_type, message):
         'timestamp': timestamp
     })
 
+# Validation rules for each configuration key accepted by the settings API
+CONFIG_VALIDATION_RULES = {
+    'trends_limit': {
+        'type': int,
+        'min': 1,
+        'max': 50,
+        'description': 'Number of trends to fetch'
+    },
+    'cycle_duration': {
+        'type': int,
+        'min': 1,
+        'max': 1440,  # Max 24 hours
+        'description': 'Cycle duration in minutes'
+    },
+    'ai_temperature': {
+        'type': float,
+        'min': 0.0,
+        'max': 2.0,
+        'description': 'AI creativity level'
+    },
+    'sleep_hours': {
+        'type': list,
+        'element_type': int,
+        'min_elements': 0,
+        'max_elements': 24,
+        'element_min': 0,
+        'element_max': 23,
+        'description': 'Hours when bot sleeps'
+    },
+    'trend_country': {
+        'type': str,
+        'allowed_values': [
+            'turkey', 'usa', 'uk', 'germany', 'france', 'italy',
+            'spain', 'netherlands', 'canada', 'australia', 'japan',
+            'korea', 'india', 'brazil', 'mexico'
+        ],
+        'description': 'Country for trending topics'
+    },
+    'ai_model': {
+        'type': str,
+        'allowed_values': [
+            'gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.0-pro',
+            'gemini-2.0-flash-exp', 'gemini-2.5-flash', 'gemini-2.5-pro'
+        ],
+        'description': 'AI model to use'
+    },
+    'api_key': {
+        'type': str,
+        'min_length': 10,
+        'max_length': 200,
+        'pattern': r'^[A-Za-z0-9_-]+$',
+        'description': 'Twitter API key'
+    },
+    'api_secret': {
+        'type': str,
+        'min_length': 10,
+        'max_length': 200,
+        'pattern': r'^[A-Za-z0-9_-]+$',
+        'description': 'Twitter API secret'
+    },
+    'access_token': {
+        'type': str,
+        'min_length': 10,
+        'max_length': 200,
+        'pattern': r'^[A-Za-z0-9_-]+$',
+        'description': 'Twitter access token'
+    },
+    'access_token_secret': {
+        'type': str,
+        'min_length': 10,
+        'max_length': 200,
+        'pattern': r'^[A-Za-z0-9_-]+$',
+        'description': 'Twitter access token secret'
+    },
+    'bearer_token': {
+        'type': str,
+        'min_length': 10,
+        'max_length': 500,
+        'pattern': r'^[A-Za-z0-9_%-]+$',
+        'description': 'Twitter bearer token'
+    },
+    'user_id': {
+        'type': str,
+        'min_length': 1,
+        'max_length': 50,
+        'pattern': r'^[0-9]+$',
+        'description': 'Twitter user ID (numeric)'
+    },
+    'gemini_api_key': {
+        'type': str,
+        'min_length': 10,
+        'max_length': 200,
+        'pattern': r'^[A-Za-z0-9_-]+$',
+        'description': 'Gemini API key'
+    },
+    'flask_secret_key': {
+        'type': str,
+        'min_length': 32,
+        'max_length': 500,
+        'description': 'Flask secret key for session security'
+    }
+}
+
+class ConfigValueError(ValueError):
+    """A configuration value failed validation; the message is shown to the user."""
+
+def check_bounds(value, low, high, too_low_message, too_high_message):
+    """Raise ConfigValueError when value is outside the optional low/high bounds."""
+    if low is not None and value < low:
+        raise ConfigValueError(too_low_message)
+    if high is not None and value > high:
+        raise ConfigValueError(too_high_message)
+
+def validate_number_value(value, rule, number_type):
+    """Validate an int or float setting and return the converted number."""
+    description = rule['description']
+    if isinstance(value, str) and not value.strip():
+        raise ConfigValueError(f"{description} cannot be empty")
+    number = number_type(value)
+    # NaN fails every range comparison, so reject non-finite values explicitly
+    if number_type is float and not math.isfinite(number):
+        raise ConfigValueError(f"{description} must be a finite number")
+    check_bounds(number, rule.get('min'), rule.get('max'),
+                 f"{description} must be >= {rule.get('min')}",
+                 f"{description} must be <= {rule.get('max')}")
+    return number
+
+def validate_str_value(value, rule):
+    """Validate a string setting against length, pattern and allowed values."""
+    description = rule['description']
+    sanitized = str(value).strip()
+    check_bounds(len(sanitized), rule.get('min_length'), rule.get('max_length'),
+                 f"{description} must be at least {rule.get('min_length')} characters",
+                 f"{description} must be at most {rule.get('max_length')} characters")
+    if 'pattern' in rule and not re.match(rule['pattern'], sanitized):
+        raise ConfigValueError(f"{description} contains invalid characters")
+    if 'allowed_values' in rule and sanitized not in rule['allowed_values']:
+        raise ConfigValueError(f"{description} must be one of: {', '.join(rule['allowed_values'])}")
+    return sanitized
+
+def parse_list_value(value, description):
+    """Accept a list or a comma-separated string and return a list of items."""
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(',') if item.strip()]
+    raise ConfigValueError(f"{description} must be a list or comma-separated string")
+
+def validate_list_element(element, rule):
+    """Validate one list element, converting it to int when the rule asks for it."""
+    if rule.get('element_type') is not int:
+        return element
+    description = rule['description']
+    try:
+        number = int(element)
+    except (ValueError, TypeError):
+        raise ConfigValueError(f"{description} contains invalid element: {element}")
+    check_bounds(number, rule.get('element_min'), rule.get('element_max'),
+                 f"{description} elements must be >= {rule.get('element_min')}",
+                 f"{description} elements must be <= {rule.get('element_max')}")
+    return number
+
+def validate_list_value(value, rule):
+    """Validate a list setting and return it as comma-separated text."""
+    description = rule['description']
+    items = parse_list_value(value, description)
+    check_bounds(len(items), rule.get('min_elements'), rule.get('max_elements'),
+                 f"{description} must have at least {rule.get('min_elements')} elements",
+                 f"{description} must have at most {rule.get('max_elements')} elements")
+    elements = [validate_list_element(element, rule) for element in items]
+    # Lists are stored as comma-separated values (the format get_sleep_hours reads)
+    return ','.join(map(str, elements))
+
+CONFIG_TYPE_VALIDATORS = {
+    int: lambda value, rule: validate_number_value(value, rule, int),
+    float: lambda value, rule: validate_number_value(value, rule, float),
+    str: validate_str_value,
+    list: validate_list_value,
+}
+
+def check_flask_secret_strength(secret_key):
+    """Reject a very weak Flask secret key and log warnings for a weak one."""
+    is_strong, issues, score = validate_secret_key_strength(secret_key)
+    if not is_strong and score < 3:
+        raise ConfigValueError(f"Flask secret key is too weak (score: {score}/7): {'; '.join(issues)}")
+    if not is_strong:
+        # Log warnings but accept the key
+        secure_log('warning', f"Flask secret key has issues (score: {score}/7): {'; '.join(issues)}")
+
 def validate_config_value(key, value):
     """
     Validate configuration values against expected types and constraints
     Returns: (is_valid: bool, sanitized_value: str, error_message: str)
     """
-    
-    # Define validation rules for each configuration key
-    validation_rules = {
-        'trends_limit': {
-            'type': int,
-            'min': 1,
-            'max': 50,
-            'description': 'Number of trends to fetch'
-        },
-        'cycle_duration': {
-            'type': int, 
-            'min': 1,
-            'max': 1440,  # Max 24 hours
-            'description': 'Cycle duration in minutes'
-        },
-        'ai_temperature': {
-            'type': float,
-            'min': 0.0,
-            'max': 2.0,
-            'description': 'AI creativity level'
-        },
-        'sleep_hours': {
-            'type': list,
-            'element_type': int,
-            'min_elements': 0,
-            'max_elements': 24,
-            'element_min': 0,
-            'element_max': 23,
-            'description': 'Hours when bot sleeps'
-        },
-        'trend_country': {
-            'type': str,
-            'allowed_values': [
-                'turkey', 'usa', 'uk', 'germany', 'france', 'italy', 
-                'spain', 'netherlands', 'canada', 'australia', 'japan',
-                'korea', 'india', 'brazil', 'mexico'
-            ],
-            'description': 'Country for trending topics'
-        },
-        'ai_model': {
-            'type': str,
-            'allowed_values': [
-                'gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.0-pro',
-                'gemini-2.0-flash-exp', 'gemini-2.5-flash', 'gemini-2.5-pro'
-            ],
-            'description': 'AI model to use'
-        },
-        'api_key': {
-            'type': str,
-            'min_length': 10,
-            'max_length': 200,
-            'pattern': r'^[A-Za-z0-9_-]+$',
-            'description': 'Twitter API key'
-        },
-        'api_secret': {
-            'type': str,
-            'min_length': 10,
-            'max_length': 200,
-            'pattern': r'^[A-Za-z0-9_-]+$',
-            'description': 'Twitter API secret'
-        },
-        'access_token': {
-            'type': str,
-            'min_length': 10,
-            'max_length': 200,
-            'pattern': r'^[A-Za-z0-9_-]+$',
-            'description': 'Twitter access token'
-        },
-        'access_token_secret': {
-            'type': str,
-            'min_length': 10,
-            'max_length': 200,
-            'pattern': r'^[A-Za-z0-9_-]+$',
-            'description': 'Twitter access token secret'
-        },
-        'bearer_token': {
-            'type': str,
-            'min_length': 10,
-            'max_length': 500,
-            'pattern': r'^[A-Za-z0-9_%-]+$',
-            'description': 'Twitter bearer token'
-        },
-        'user_id': {
-            'type': str,
-            'min_length': 1,
-            'max_length': 50,
-            'pattern': r'^[0-9]+$',
-            'description': 'Twitter user ID (numeric)'
-        },
-        'gemini_api_key': {
-            'type': str,
-            'min_length': 10,
-            'max_length': 200,
-            'pattern': r'^[A-Za-z0-9_-]+$',
-            'description': 'Gemini API key'
-        },
-        'flask_secret_key': {
-            'type': str,
-            'min_length': 32,
-            'max_length': 500,
-            'description': 'Flask secret key for session security'
-        }
-    }
-    
     # Check if key is allowed
-    if key not in validation_rules:
+    if key not in CONFIG_VALIDATION_RULES:
         return False, "", f"Configuration key '{key}' is not allowed"
-    
-    rule = validation_rules[key]
-    
+
+    rule = CONFIG_VALIDATION_RULES[key]
     try:
-        # Type validation and conversion
-        if rule['type'] == int:
-            if isinstance(value, str) and not value.strip():
-                return False, "", f"{rule['description']} cannot be empty"
-            sanitized = int(value)
-            
-            # Range validation
-            if 'min' in rule and sanitized < rule['min']:
-                return False, "", f"{rule['description']} must be >= {rule['min']}"
-            if 'max' in rule and sanitized > rule['max']:
-                return False, "", f"{rule['description']} must be <= {rule['max']}"
-                
-        elif rule['type'] == float:
-            if isinstance(value, str) and not value.strip():
-                return False, "", f"{rule['description']} cannot be empty"
-            sanitized = float(value)
-            # NaN fails every comparison below, so reject non-finite values explicitly
-            if not math.isfinite(sanitized):
-                return False, "", f"{rule['description']} must be a finite number"
-
-            # Range validation
-            if 'min' in rule and sanitized < rule['min']:
-                return False, "", f"{rule['description']} must be >= {rule['min']}"
-            if 'max' in rule and sanitized > rule['max']:
-                return False, "", f"{rule['description']} must be <= {rule['max']}"
-                
-        elif rule['type'] == str:
-            sanitized = str(value).strip()
-            
-            # Length validation
-            if 'min_length' in rule and len(sanitized) < rule['min_length']:
-                return False, "", f"{rule['description']} must be at least {rule['min_length']} characters"
-            if 'max_length' in rule and len(sanitized) > rule['max_length']:
-                return False, "", f"{rule['description']} must be at most {rule['max_length']} characters"
-            
-            # Pattern validation
-            if 'pattern' in rule:
-                import re
-                if not re.match(rule['pattern'], sanitized):
-                    return False, "", f"{rule['description']} contains invalid characters"
-                    
-            # Allowed values validation
-            if 'allowed_values' in rule and sanitized not in rule['allowed_values']:
-                return False, "", f"{rule['description']} must be one of: {', '.join(rule['allowed_values'])}"
-                
-        elif rule['type'] == list:
-            if isinstance(value, str):
-                # Handle comma-separated string
-                if not value.strip():
-                    sanitized = []
-                else:
-                    sanitized = [item.strip() for item in value.split(',') if item.strip()]
-            elif isinstance(value, list):
-                sanitized = value
-            else:
-                return False, "", f"{rule['description']} must be a list or comma-separated string"
-            
-            # List size validation
-            if 'min_elements' in rule and len(sanitized) < rule['min_elements']:
-                return False, "", f"{rule['description']} must have at least {rule['min_elements']} elements"
-            if 'max_elements' in rule and len(sanitized) > rule['max_elements']:
-                return False, "", f"{rule['description']} must have at most {rule['max_elements']} elements"
-            
-            # Element validation
-            if 'element_type' in rule:
-                validated_elements = []
-                for element in sanitized:
-                    try:
-                        if rule['element_type'] == int:
-                            elem = int(element)
-                            if 'element_min' in rule and elem < rule['element_min']:
-                                return False, "", f"{rule['description']} elements must be >= {rule['element_min']}"
-                            if 'element_max' in rule and elem > rule['element_max']:
-                                return False, "", f"{rule['description']} elements must be <= {rule['element_max']}"
-                            validated_elements.append(elem)
-                        else:
-                            validated_elements.append(element)
-                    except (ValueError, TypeError):
-                        return False, "", f"{rule['description']} contains invalid element: {element}"
-                sanitized = validated_elements
-
-            # Lists are stored as comma-separated values (the format get_sleep_hours reads)
-            sanitized = ','.join(map(str, sanitized))
-
-        # Special validation for Flask secret key
+        sanitized = CONFIG_TYPE_VALIDATORS[rule['type']](value, rule)
         if key == 'flask_secret_key':
-            is_strong, issues, score = validate_secret_key_strength(sanitized)
-            if not is_strong and score < 3:
-                return False, "", f"Flask secret key is too weak (score: {score}/7): {'; '.join(issues)}"
-            elif not is_strong:
-                # Log warnings but accept the key
-                secure_log('warning', f"Flask secret key has issues (score: {score}/7): {'; '.join(issues)}")
-        
+            check_flask_secret_strength(sanitized)
         return True, str(sanitized), ""
-        
+    except ConfigValueError as e:
+        return False, "", str(e)
     except (ValueError, TypeError) as e:
         return False, "", f"Invalid {rule['description']}: {str(e)}"
 
