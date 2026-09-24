@@ -6,7 +6,7 @@ Loads environment variables once and provides cached access
 import os
 import threading
 import time
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 
 class ConfigManager:
     """Thread-safe centralized configuration manager"""
@@ -31,14 +31,20 @@ class ConfigManager:
                     self._config_cache = {}
                     self._last_reload = 0
                     self._reload_interval = 300  # 5 minutes
+                    # Variables set by the process environment (Docker, systemd) take
+                    # precedence over token.env and are never overwritten by reloads
+                    self._process_env_keys = set(os.environ)
                     self._load_config()
                     self._initialized = True
-    
+
     def _load_config(self):
         """Load environment variables from token.env"""
         try:
-            # Use override=True to force reload of changed values
-            load_dotenv("token.env", override=True)
+            # Apply every token.env value on each reload so dashboard edits take effect,
+            # except keys the process environment already defined
+            for key, value in dotenv_values("token.env").items():
+                if value is not None and key not in self._process_env_keys:
+                    os.environ[key] = value
             self._last_reload = time.time()
             print("[CONFIG] Environment variables reloaded successfully")
         except Exception as e:
