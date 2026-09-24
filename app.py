@@ -735,33 +735,33 @@ def api_retry_tweet(tweet_id):
         conn = database.get_db_connection()
         if not conn:
             return jsonify({"success": False, "message": "Veritabanı bağlantı hatası"})
-            
+
         try:
-            with conn:  # Auto-commit and cleanup
-                cursor = conn.cursor()
-                
-                cursor.execute(f"SELECT tweet_text FROM {safe_table} WHERE id = ? AND sent = 0", (tweet_id,))
-                tweet_data = cursor.fetchone()
-                
-                if not tweet_data:
-                    return jsonify({"success": False, "message": "Tweet bulunamadı veya zaten gönderilmiş"})
-                
-                tweet_text = tweet_data[0]
-                
-                # Try to post the tweet again
-                status = main.scheduled_tweet(tweet_text)
-                
-                if status:
-                    # Update database to mark as sent
-                    cursor.execute(f"UPDATE {safe_table} SET sent = 1 WHERE id = ?", (tweet_id,))
-                    message = "Tweet başarıyla tekrar gönderildi"
-                else:
-                    message = "Tweet tekrar gönderilemedi"
+            cursor = conn.cursor()
+            cursor.execute(f"SELECT tweet_text FROM {safe_table} WHERE id = ? AND sent = 0", (tweet_id,))
+            tweet_data = cursor.fetchone()
         finally:
-            conn.close()  # Ensure connection is closed
-            
-            return jsonify({"success": status, "message": message})
-            
+            conn.close()  # Do not hold the connection during the Twitter call
+
+        if not tweet_data:
+            return jsonify({"success": False, "message": "Tweet bulunamadı veya zaten gönderilmiş"})
+
+        # Try to post the tweet again
+        status = main.scheduled_tweet(tweet_data[0])
+        if not status:
+            return jsonify({"success": False, "message": "Tweet tekrar gönderilemedi"})
+
+        # Update database to mark as sent
+        conn = database.get_db_connection()
+        if not conn:
+            return jsonify({"success": False, "message": "Tweet gönderildi ancak veritabanı güncellenemedi"})
+        try:
+            with conn:  # Commits on success
+                conn.execute(f"UPDATE {safe_table} SET sent = 1 WHERE id = ?", (tweet_id,))
+        finally:
+            conn.close()
+        return jsonify({"success": True, "message": "Tweet başarıyla tekrar gönderildi"})
+
     except Exception as e:
         return jsonify({"success": False, "message": f"Hata: {str(e)}"})
 
