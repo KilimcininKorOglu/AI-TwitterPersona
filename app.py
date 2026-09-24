@@ -2197,7 +2197,14 @@ def api_update_prompt(prompt_type):
                 'success': False,
                 'message': 'Prompt metni gerekli'
             }), 400
-        
+
+        template_error = database.validate_prompt_template(prompt_text, database.get_persona_settings().keys())
+        if template_error:
+            return jsonify({
+                'success': False,
+                'message': template_error
+            }), 400
+
         success = database.update_prompt(prompt_type, prompt_text, description)
         
         if success:

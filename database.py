@@ -2,6 +2,7 @@ import sqlite3          # Built-in SQLite database interface
 import datetime as dt   # For timestamp generation
 import os              # For environment variable access
 import threading       # For thread-safe database operations
+import string          # For prompt template placeholder parsing
 from config import get_config  # Centralized configuration
 
 # Database Configuration - customizable via environment variables
@@ -473,8 +474,9 @@ def get_active_prompts_dict():
             try:
                 formatted_text = prompt_text.format(**persona_settings)
                 formatted_prompts[prompt_type] = formatted_text
-            except KeyError as e:
-                print(f"[-] Warning: Missing persona setting {e} for prompt {prompt_type}")
+            except (KeyError, IndexError, ValueError, AttributeError) as e:
+                # One malformed template must not disable every persona
+                print(f"[-] Warning: Cannot format prompt {prompt_type}: {type(e).__name__}: {e}")
                 formatted_prompts[prompt_type] = prompt_text  # Use unformatted as fallback
         
         return formatted_prompts
@@ -487,6 +489,27 @@ def get_active_prompts_dict():
             cursor.close()
         if 'db' in locals() and db:
             db.close()
+
+def validate_prompt_template(prompt_text, setting_keys):
+    """
+    Check that a prompt template only uses plain {setting_key} placeholders.
+
+    Args:
+        prompt_text (str): Prompt template to check
+        setting_keys (iterable): Persona setting keys allowed as placeholders
+
+    Returns:
+        str or None: Error message if the template is invalid, None if it is valid
+    """
+    allowed = set(setting_keys)
+    try:
+        fields = [field for _, field, _, _ in string.Formatter().parse(prompt_text) if field is not None]
+    except ValueError as e:
+        return f"Geçersiz süslü parantez kullanımı: {e}. Düz metin için {{{{ ve }}}} kullanın."
+    for field in fields:
+        if field not in allowed:
+            return f"Bilinmeyen yer tutucu: {{{field}}}. İzin verilenler: {', '.join(sorted(allowed))}"
+    return None
 
 def get_persona_settings():
     """
