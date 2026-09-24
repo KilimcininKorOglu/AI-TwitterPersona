@@ -664,6 +664,12 @@ def api_manual_tweet():
     except Exception as e:
         return jsonify({"success": False, "message": f"Hata: {str(e)}"})
 
+def strip_wrapping_quotes(text):
+    """Remove the double quotes the AI sometimes wraps a tweet in."""
+    if len(text) >= 2 and text.startswith('"') and text.endswith('"'):
+        return text[1:-1]
+    return text
+
 @app.route('/api/enhance', methods=['POST'])
 @login_required
 def api_enhance_tweet():
@@ -702,11 +708,7 @@ def api_enhance_tweet():
 
         model = genai.GenerativeModel(get_config("GEMINI_MODEL", "gemini-2.5-flash"))
         response = model.generate_content(enhancement_prompt)
-        enhanced_text = response.text.strip()
-
-        # Remove any quotes if AI wrapped it in quotes
-        if enhanced_text.startswith('"') and enhanced_text.endswith('"'):
-            enhanced_text = enhanced_text[1:-1]
+        enhanced_text = strip_wrapping_quotes(response.text.strip())
 
         # Just validate length, don't truncate - let AI handle it properly
         if not tweet_length_rules.fits_in_tweet(enhanced_text):
@@ -723,9 +725,7 @@ def api_enhance_tweet():
             Sadece tweet metnini döndür."""
 
             response = model.generate_content(enhancement_prompt_retry)
-            enhanced_text = response.text.strip()
-            if enhanced_text.startswith('"') and enhanced_text.endswith('"'):
-                enhanced_text = enhanced_text[1:-1]
+            enhanced_text = strip_wrapping_quotes(response.text.strip())
 
         return jsonify({
             "success": True,
