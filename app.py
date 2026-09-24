@@ -9,7 +9,7 @@ import bcrypt
 import threading
 import time
 import os
-from config import get_config, get_int_config, get_bool_config, reload_config  # Centralized configuration
+from config import get_config, get_int_config, get_bool_config, reload_config, get_sleep_hours  # Centralized configuration
 import sqlite3
 from datetime import datetime, timedelta, timezone
 import json
@@ -1152,16 +1152,8 @@ def get_current_config():
     current_url = get_config("TRENDS_URL", "https://xtrends.iamrohit.in/turkey")
     trend_country = url_to_country.get(current_url, 'turkey')
     
-    # Parse SLEEP_HOURS safely
-    sleep_hours_raw = get_config("SLEEP_HOURS", "1,3,9,10")
-    # Remove brackets if present
-    if sleep_hours_raw.startswith('['):
-        sleep_hours_raw = sleep_hours_raw.strip('[]')
-    # Parse the hours
-    try:
-        sleep_hours = [int(x.strip()) for x in sleep_hours_raw.split(",")]
-    except ValueError:
-        sleep_hours = [1, 3, 9, 10]  # Default values
+    # Parse SLEEP_HOURS with the same rules the bot uses
+    sleep_hours = get_sleep_hours()
 
     return {
         "trends_limit": get_int_config("TRENDS_LIMIT", 3),
@@ -1575,7 +1567,10 @@ def validate_config_value(key, value):
                     except (ValueError, TypeError):
                         return False, "", f"{rule['description']} contains invalid element: {element}"
                 sanitized = validated_elements
-        
+
+            # Lists are stored as comma-separated values (the format get_sleep_hours reads)
+            sanitized = ','.join(map(str, sanitized))
+
         # Special validation for Flask secret key
         if key == 'flask_secret_key':
             is_strong, issues, score = validate_secret_key_strength(sanitized)
@@ -1660,15 +1655,7 @@ def update_token_env(new_config):
             line_updated = False
             for config_key, env_key in config_mappings.items():
                 if line.startswith(f"{env_key}=") and config_key in validated_config:
-                    if config_key == 'sleep_hours':
-                        # Handle sleep_hours as comma-separated list
-                        if isinstance(validated_config[config_key], str):
-                            # Already validated as string
-                            value = validated_config[config_key]
-                        else:
-                            # Convert list to comma-separated string
-                            value = ','.join(map(str, validated_config[config_key]))
-                    elif config_key == 'trend_country':
+                    if config_key == 'trend_country':
                         # Convert country code to URL (already validated)
                         country = validated_config[config_key]
                         value = country_urls.get(country, country_urls['turkey'])
@@ -1684,22 +1671,6 @@ def update_token_env(new_config):
             
             if not line_updated:
                 updated_lines.append(line)
-        
-        # Handle sleep_hours separately (already validated)
-        if 'sleep_hours' in validated_config:
-            sleep_hours_updated = False
-            for i, line in enumerate(updated_lines):
-                if line.startswith('SLEEP_HOURS='):
-                    if isinstance(validated_config['sleep_hours'], str):
-                        value = validated_config['sleep_hours']
-                    else:
-                        # Format as [1, 2, 3] with brackets and spaces to match token.env format
-                        value = '[' + ', '.join(map(str, validated_config['sleep_hours'])) + ']'
-                    # SECURITY: Sanitize value
-                    sanitized_value = value.replace('\n', '').replace('\r', '').replace('\0', '')
-                    updated_lines[i] = f"SLEEP_HOURS={sanitized_value}\n"
-                    sleep_hours_updated = True
-                    break
         
         # SECURITY: Create backup before modifying file
         backup_filename = 'token.env.backup'

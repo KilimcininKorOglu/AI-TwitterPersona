@@ -3,7 +3,7 @@ import datetime as dt    # For current time checks and scheduling
 import random           # For random topic selection from trending list
 import os               # For environment variable access
 import requests         # For HTTP requests (used in error handling)
-from config import get_int_config, get_list_config, get_config  # Centralized configuration
+from config import get_int_config, get_config, get_sleep_hours  # Centralized configuration
 import logging  # For secure logging
 import database       # SQLite database operations for tweet logging
 import threading         # For thread-safe module initialization
@@ -57,17 +57,7 @@ if TRENDS_LIMIT <= 0:
     TRENDS_LIMIT = 3
     print("[!] Warning: TRENDS_LIMIT must be positive, using default: 3")
 
-SLEEP_HOURS = get_list_config("SLEEP_HOURS", ["1", "3", "9", "10"])
-try:
-    SLEEP_HOURS = [int(h.strip()) for h in SLEEP_HOURS]  # Hours when bot doesn't post
-    # Validate all hours are in 0-23 range
-    SLEEP_HOURS = [h for h in SLEEP_HOURS if 0 <= h <= 23]
-    if not SLEEP_HOURS:
-        SLEEP_HOURS = [1, 3, 9, 10]
-        print("[!] Warning: Invalid SLEEP_HOURS values, using default: [1,3,9,10]")
-except ValueError:
-    SLEEP_HOURS = [1, 3, 9, 10]
-    print("[!] Warning: Invalid SLEEP_HOURS format, using default: [1,3,9,10]")
+SLEEP_HOURS = get_sleep_hours()  # Hours when bot posts a general tweet instead of trends
 
 CYCLE_DURATION_MINUTES = get_int_config("CYCLE_DURATION_MINUTES", 60)  # Sleep time between tweet cycles
 if CYCLE_DURATION_MINUTES <= 0:

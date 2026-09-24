@@ -121,3 +121,29 @@ def get_list_config(key, default=None, separator=','):
 def reload_config():
     """Force reload configuration"""
     return config.reload()
+
+DEFAULT_SLEEP_HOURS = [1, 3, 9, 10]
+
+def get_sleep_hours():
+    """
+    Parse SLEEP_HOURS into a list of hours (0-23).
+
+    Accepts "1,3,9" and the legacy bracketed "[1, 3, 9]" format. An unset key
+    returns the default hours; an explicitly empty value means no sleep hours.
+    Invalid or out-of-range values fall back to the default hours.
+    """
+    raw = config.get("SLEEP_HOURS")
+    if raw is None:
+        return list(DEFAULT_SLEEP_HOURS)
+    raw = raw.strip().strip('[]').strip()
+    if not raw:
+        return []
+    try:
+        hours = [int(item.strip()) for item in raw.split(',') if item.strip()]
+    except ValueError:
+        print(f"[!] Warning: Invalid SLEEP_HOURS format '{raw}', using default: {DEFAULT_SLEEP_HOURS}")
+        return list(DEFAULT_SLEEP_HOURS)
+    if any(not 0 <= hour <= 23 for hour in hours):
+        print(f"[!] Warning: SLEEP_HOURS values must be 0-23, using default: {DEFAULT_SLEEP_HOURS}")
+        return list(DEFAULT_SLEEP_HOURS)
+    return hours
