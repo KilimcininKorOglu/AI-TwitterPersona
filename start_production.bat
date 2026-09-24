@@ -24,27 +24,18 @@ REM Activate virtual environment
 echo [INFO] Activating virtual environment...
 call venv\Scripts\activate.bat
 
-REM Check if Gunicorn is installed
-python -c "import gunicorn" >nul 2>&1
+REM Gunicorn does not run on Windows (it needs fcntl and pwd), so production.py
+REM serves the app with Flask-SocketIO on eventlet instead
+python -c "import eventlet" >nul 2>&1
 if errorlevel 1 (
-    echo [WARNING] Gunicorn not found. Installing...
-    pip install gunicorn
-    if errorlevel 1 (
-        echo [ERROR] Failed to install Gunicorn
-        pause
-        exit /b 1
-    )
+    echo [ERROR] eventlet not found. Run setup.bat first
+    pause
+    exit /b 1
 )
 
 REM Check configuration
 if not exist "token.env" (
     echo [ERROR] token.env file not found
-    pause
-    exit /b 1
-)
-
-if not exist "gunicorn.conf.py" (
-    echo [ERROR] gunicorn.conf.py file not found
     pause
     exit /b 1
 )
@@ -70,7 +61,7 @@ echo.
 
 REM Enable proper signal handling
 set PYTHONUNBUFFERED=1
-gunicorn --config gunicorn.conf.py app:app --workers=1 --bind=%WEB_HOST%:%WEB_PORT%
+python production.py
 
 echo.
 echo [INFO] Production server stopped.
