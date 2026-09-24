@@ -85,6 +85,10 @@ if CYCLE_DURATION_MINUTES <= 0:
     CYCLE_DURATION_MINUTES = 60
     print("[!] Warning: CYCLE_DURATION_MINUTES must be positive, using default: 60")
 
+# Delays before retrying after a failed cycle, matching the dashboard bot thread
+RETRY_DELAY_SECONDS = 60
+POLITICAL_SKIP_DELAY_SECONDS = 10
+
 # Global variables for lazy initialization with thread safety
 client = None
 USER_ID = get_config("USER_ID")
@@ -279,6 +283,7 @@ def run_bot():
             # Fetch trending topics from Turkey
             topic = trending_tweets()
             if not topic:
+                time.sleep(RETRY_DELAY_SECONDS)
                 continue  # Skip this cycle if no trends found
             
             # Create detailed prompt for AI with trending topic information
@@ -302,6 +307,7 @@ def run_bot():
         if tweet is None:
             print("[!] Political topic detected, trying another trending topic...")
             # Skip this topic and try to get another one
+            time.sleep(POLITICAL_SKIP_DELAY_SECONDS)
             continue
         elif tweet:
             print(f"Tweet: {tweet}")
@@ -316,8 +322,9 @@ def run_bot():
                 # Log the tweet attempt to database (success or failure)
                 database.save_tweets(tweet=tweet, tweet_type="tweet", status=status)
                 
-                # If tweet posting failed, continue to next cycle
+                # If tweet posting failed, wait and continue to next cycle
                 if not status:
+                    time.sleep(RETRY_DELAY_SECONDS)
                     continue
                 
                 # Successfully posted - begin sleep cycle
@@ -340,6 +347,7 @@ def run_bot():
             print("\n")  # Add newline after cycle completion
         else:
             print("Reply not generated...")  # AI failed to generate tweet
+            time.sleep(RETRY_DELAY_SECONDS)
 
 # Start the bot when this module is executed directly
 if __name__ == "__main__":
