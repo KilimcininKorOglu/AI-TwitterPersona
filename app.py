@@ -1915,17 +1915,15 @@ def api_analytics_trending_topics():
         conn = sqlite3.connect(database.dbName)
         cursor = conn.cursor()
         
-        # Get most common words/topics from tweet content
+        # Get recent sent tweets; word frequencies are counted below. (An aggregate
+        # without GROUP BY returned a single arbitrary row.)
         cursor.execute("""
-            SELECT 
-                tweet_text,
-                COUNT(*) as frequency,
-                DATE(created_at) as last_used
-            FROM tweets 
+            SELECT tweet_text
+            FROM tweets
             WHERE created_at >= datetime('now', '-30 days')
             AND sent = 1
-            ORDER BY frequency DESC
-            LIMIT 20
+            ORDER BY created_at DESC
+            LIMIT 500
         """)
         
         results = cursor.fetchall()
@@ -1935,7 +1933,7 @@ def api_analytics_trending_topics():
         word_frequency = {}
         max_unique_words = 1000  # Limit to prevent unbounded memory growth
         
-        for content, freq, last_used in results:
+        for (content,) in results:
             if content and len(word_frequency) < max_unique_words:
                 # Basic word extraction
                 words = content.lower().split()
@@ -1944,7 +1942,7 @@ def api_analytics_trending_topics():
                     import re
                     clean_word = re.sub(r'[^\w\sğüşıöçĞÜŞİÖÇ]', '', word)
                     if len(clean_word) > 3 and not clean_word.startswith('http'):
-                        word_frequency[clean_word] = word_frequency.get(clean_word, 0) + freq
+                        word_frequency[clean_word] = word_frequency.get(clean_word, 0) + 1
                         
                         # Additional protection: stop if dictionary gets too large
                         if len(word_frequency) >= max_unique_words:
