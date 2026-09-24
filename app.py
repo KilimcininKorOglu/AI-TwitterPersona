@@ -830,18 +830,6 @@ def api_delete_tweet(tweet_id):
     except Exception as e:
         return jsonify({"success": False, "message": f"Hata: {str(e)}"})
 
-@app.route('/api/debug/env', methods=['GET'])
-def debug_env_vars():
-    """Debug endpoint to check current environment variables"""
-    reload_config()  # Force reload from centralized config
-    
-    return jsonify({
-        'TRENDS_LIMIT': get_config('TRENDS_LIMIT'),
-        'SLEEP_HOURS': get_config('SLEEP_HOURS'),
-        'CYCLE_DURATION_MINUTES': get_config('CYCLE_DURATION_MINUTES'),
-        'current_config': get_current_config()
-    })
-
 @app.route('/api/config', methods=['GET', 'PUT']) 
 @login_required  # Ensure only authenticated users can access
 def api_config():
