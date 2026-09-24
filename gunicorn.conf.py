@@ -58,8 +58,9 @@ limit_request_line = 4094
 limit_request_fields = 100
 limit_request_field_size = 8190
 
-# Preload application for better performance
-preload_app = True
+# Do not preload: the eventlet worker must monkey-patch before app.py creates its
+# threading locks, otherwise those locks are not greened and can block the only worker
+preload_app = False
 
 # SSL (uncomment if using HTTPS)
 # keyfile = '/path/to/private.key'
