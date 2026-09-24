@@ -1,15 +1,12 @@
 name: Cleanup Artifacts
 
-# The build matrix uploads one IPK artifact per architecture (30+ per run) only so
-# the publish job can download them again. They serve no purpose afterwards, and a
-# full artifact store makes every later run fail at "Upload package artifact" with
-# "Artifact storage quota has been hit", which skips the publish job and leaves the
-# release without IPKs. This workflow deletes the leftovers.
+# Deletes old and expired GitHub Actions artifacts of this repository. Expired
+# artifacts still count against the storage quota until they are removed, and a
+# full quota makes artifact uploads fail in every workflow.
 
 on:
   schedule:
-    # 04:07 UTC daily. An off-hour, off-minute slot keeps this away from the
-    # release runs and away from the crowded top of the hour.
+    # 04:07 UTC daily, an off-hour, off-minute slot away from the crowded top of the hour
     - cron: '7 4 * * *'
   workflow_dispatch:
     inputs:
@@ -30,7 +27,13 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const maxAgeDays = Number(context.payload.inputs?.max_age_days ?? 1);
+            // Scheduled runs have no inputs and use the 1 day default
+            const rawMaxAge = context.payload.inputs?.max_age_days ?? '1';
+            const maxAgeDays = Number(rawMaxAge);
+            if (String(rawMaxAge).trim() === '' || !Number.isFinite(maxAgeDays) || maxAgeDays < 0) {
+              core.setFailed(`max_age_days must be a number >= 0, got "${rawMaxAge}"`);
+              return;
+            }
             const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
 
             const artifacts = await github.paginate(
@@ -62,7 +65,7 @@ jobs:
 
             const mib = (freed / 1024 / 1024).toFixed(1);
             core.info(`scanned=${artifacts.length} deleted=${deleted} kept=${kept} failed=${failed} freed=${mib} MiB`);
-            core.summary
+            await core.summary
               .addHeading('Artifact cleanup')
               .addTable([
                 [{ data: 'Metric', header: true }, { data: 'Value', header: true }],
