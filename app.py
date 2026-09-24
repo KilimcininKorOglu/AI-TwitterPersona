@@ -11,7 +11,7 @@ import time
 import os
 from config import get_config, get_int_config, get_bool_config, reload_config  # Centralized configuration
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 from functools import lru_cache
 import gc  # For memory management
@@ -1011,6 +1011,18 @@ def api_force_tweet():
         return jsonify({"success": False, "message": f"Zorla tweet hatası: {str(e)}"})
 
 # Helper Functions
+def timezone_offset_hours():
+    """Hours between UTC and the dashboard's local time (TIMEZONE_OFFSET, default UTC+3)."""
+    return get_int_config("TIMEZONE_OFFSET", 3)
+
+def local_now():
+    """Current time in the dashboard's local timezone as a naive datetime."""
+    return datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=timezone_offset_hours())
+
+def sqlite_tz_modifier():
+    """SQLite date modifier that shifts UTC created_at values to local time."""
+    return f"{timezone_offset_hours():+d} hours"
+
 def update_stats():
     """Update bot statistics from database"""
     global bot_stats
@@ -1031,9 +1043,7 @@ def update_stats():
                 # Convert UTC to local time for display
                 try:
                     utc_time = datetime.strptime(last_tweet[1], "%Y-%m-%d %H:%M:%S")
-                    # Get timezone offset from config (default: UTC+3 for Turkey)
-                    tz_offset = get_int_config("TIMEZONE_OFFSET", 3)
-                    local_time = utc_time + timedelta(hours=tz_offset)
+                    local_time = utc_time + timedelta(hours=timezone_offset_hours())
                     bot_stats["last_tweet_time"] = local_time.strftime("%Y-%m-%d %H:%M:%S")
                 except ValueError:
                     bot_stats["last_tweet_time"] = last_tweet[1]
@@ -1042,14 +1052,15 @@ def update_stats():
                 bot_stats["last_tweet"] = None
                 bot_stats["last_tweet_time"] = None
 
-            # Get daily and total tweets count in single optimized query
-            today = datetime.now().strftime("%Y-%m-%d")
+            # Get daily and total tweets count in single optimized query.
+            # created_at is UTC, so shift it to the configured local timezone first.
+            today = local_now().strftime("%Y-%m-%d")
             cursor.execute(f"""
-                SELECT 
+                SELECT
                     COUNT(*) as total_tweets,
-                    SUM(CASE WHEN DATE(created_at) = ? THEN 1 ELSE 0 END) as daily_tweets
+                    SUM(CASE WHEN DATE(created_at, ?) = ? THEN 1 ELSE 0 END) as daily_tweets
                 FROM {safe_table}
-            """, (today,))
+            """, (sqlite_tz_modifier(), today))
             
             stats_result = cursor.fetchone()
             bot_stats["total_tweets"] = stats_result[0]
@@ -1726,18 +1737,18 @@ def api_analytics_success_rate():
         
         # Get success rate data by day for last 30 days
         cursor.execute("""
-            SELECT 
-                DATE(created_at) as date,
+            SELECT
+                DATE(created_at, :tz) as date,
                 COUNT(*) as total_tweets,
                 SUM(CASE WHEN sent = 1 THEN 1 ELSE 0 END) as successful_tweets,
                 ROUND(
                     (SUM(CASE WHEN sent = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*)), 2
                 ) as success_rate
-            FROM tweets 
+            FROM tweets
             WHERE created_at >= datetime('now', '-30 days')
-            GROUP BY DATE(created_at) 
+            GROUP BY DATE(created_at, :tz)
             ORDER BY date DESC
-        """)
+        """, {"tz": sqlite_tz_modifier()})
         
         results = cursor.fetchall()
         conn.close()
@@ -1847,16 +1858,16 @@ def api_analytics_hourly_activity():
         conn = sqlite3.connect(database.dbName)
         cursor = conn.cursor()
         
-        # Get tweet counts by hour for last 7 days
+        # Get tweet counts by local hour for last 7 days (created_at is UTC)
         cursor.execute("""
-            SELECT 
-                CAST(strftime('%H', created_at) AS INTEGER) as hour,
+            SELECT
+                CAST(strftime('%H', created_at, ?) AS INTEGER) as hour,
                 COUNT(*) as tweet_count
-            FROM tweets 
+            FROM tweets
             WHERE created_at >= datetime('now', '-7 days')
-            GROUP BY hour 
+            GROUP BY hour
             ORDER BY hour
-        """)
+        """, (sqlite_tz_modifier(),))
         
         results = cursor.fetchall()
         conn.close()
