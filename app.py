@@ -1657,13 +1657,20 @@ def token_env_line(config_key, value):
     sanitized_value = str(value).replace('\n', '').replace('\r', '').replace('\0', '')
     return f"{CONFIG_ENV_KEYS[config_key]}={sanitized_value}\n"
 
+ENV_TO_CONFIG_KEYS = {env_key: config_key for config_key, env_key in CONFIG_ENV_KEYS.items()}
+
+def config_key_of_line(line):
+    """Return the settings key a token.env line assigns, or None."""
+    if '=' not in line:
+        return None
+    return ENV_TO_CONFIG_KEYS.get(line.split('=', 1)[0])
+
 def render_token_env_lines(lines, validated_config):
     """Replace existing lines for validated settings and append the ones missing from the file."""
-    env_to_config = {env_key: config_key for config_key, env_key in CONFIG_ENV_KEYS.items()}
     written = set()
     updated_lines = []
     for line in lines:
-        config_key = env_to_config.get(line.split('=', 1)[0]) if '=' in line else None
+        config_key = config_key_of_line(line)
         if config_key in validated_config:
             updated_lines.append(token_env_line(config_key, validated_config[config_key]))
             written.add(config_key)
