@@ -257,10 +257,24 @@ function initializeTooltips() {
     });
 }
 
+// Run callback with the shared socket once initializeWebSocket has created it.
+// Page scripts run before DOMContentLoaded, when the socket does not exist yet.
+function onSocketReady(callback) {
+    if (window.appSocket) {
+        callback(window.appSocket);
+        return;
+    }
+    window.socketReadyCallbacks = window.socketReadyCallbacks || [];
+    window.socketReadyCallbacks.push(callback);
+}
+
 // WebSocket initialization and real-time updates
 function initializeWebSocket() {
     socket = io();
-    
+    window.appSocket = socket;
+    (window.socketReadyCallbacks || []).forEach(callback => callback(socket));
+    window.socketReadyCallbacks = [];
+
     // Connection events
     socket.on('connect', function() {
         console.log('WebSocket connected');

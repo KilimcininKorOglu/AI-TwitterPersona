@@ -281,13 +281,9 @@
         }
     }
     
-    // Listen to real WebSocket console logs
-    if (typeof socket !== 'undefined') {
-        // Listen for console log events from the server
-        socket.on('console_log', function(data) {
-            addConsoleLog(data.type, data.message, data.timestamp);
-        });
-
+    // Listen to real WebSocket events. app.js already writes console_log events
+    // to this page, and it creates the socket after this script runs.
+    onSocketReady(function(socket) {
         // Listen for bot status changes
         socket.on('bot_status', function(data) {
             if (data.message) {
@@ -300,10 +296,10 @@
             const status = data.status ? 'SUCCESS' : 'ERROR';
             const message = data.status
                 ? `Tweet gönderildi: ${data.tweet.substring(0, 50)}...`
-                : `Tweet gönderilemedi: ${data.error}`;
+                : `Tweet gönderilemedi: ${data.tweet.substring(0, 50)}...`;  // new_tweet has no error field
             addConsoleLog(status, message);
         });
-    }
+    });
     
     function addConsoleLog(type, message, timestamp = null) {
         if (!timestamp) {

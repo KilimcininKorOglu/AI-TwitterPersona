@@ -118,10 +118,9 @@ endblock %} {% block content %}
 </div>
 {% endblock %} {% block scripts %}
 <script>
-  // Socket is already initialized in app.js, no need to re-initialize
-
-  // Listen for additional bot status updates if needed
-  if (typeof socket !== 'undefined') {
+  // app.js creates the socket on DOMContentLoaded, after this script runs,
+  // so register the listeners through onSocketReady
+  onSocketReady(function(socket) {
     socket.on('dashboard_update', function(data) {
       console.log('Dashboard update:', data);
       updateBotUI(data.running);
@@ -138,7 +137,7 @@ endblock %} {% block content %}
     socket.on('new_tweet', function(data) {
       resetCountdown();
     });
-  }
+  });
 
   // Countdown timer variables
   let dashboardCountdownInterval;
