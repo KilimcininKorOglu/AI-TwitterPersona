@@ -435,7 +435,8 @@
                 if (data.success) {
                     alert(data.message || 'Ayarlar başarıyla kaydedildi ve hemen uygulandı!');
                 } else {
-                    alert('Ayarlar kaydedilemedi: ' + data.message);
+                    // The config API reports failures as error + details, not message
+                    alert('Ayarlar kaydedilemedi: ' + (data.details || data.error || data.message || 'Bilinmeyen hata'));
                 }
             })
             .catch(error => {
