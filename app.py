@@ -24,6 +24,7 @@ import hashlib  # For key strength validation
 # Import bot modules (with error handling for missing API keys)
 import database
 from database import validate_table_name
+import tweet_length as tweet_length_rules
 
 # Security-aware logging system
 def setup_secure_logging():
@@ -690,11 +691,11 @@ def api_enhance_tweet():
             enhanced_text = enhanced_text[1:-1]
 
         # Just validate length, don't truncate - let AI handle it properly
-        if len(enhanced_text) > 280:
-            print(f"Warning: AI generated tweet longer than 280 chars: {len(enhanced_text)}")
+        if not tweet_length_rules.fits_in_tweet(enhanced_text):
+            print(f"Warning: AI generated tweet longer than 280 chars: {tweet_length_rules.tweet_length(enhanced_text)}")
             # Try once more with stronger emphasis
             enhancement_prompt_retry = f"""
-            HATA: Ürettiğin tweet {len(enhanced_text)} karakter, bu çok uzun!
+            HATA: Ürettiğin tweet {tweet_length_rules.tweet_length(enhanced_text)} karakter, bu çok uzun!
 
             {persona_prompt}
 
@@ -2564,29 +2565,17 @@ def calculate_twitter_length(text):
         int: Calculated tweet length according to Twitter's counting rules
     """
     import re
-    
-    # Twitter's current t.co URL length (as of 2024)
-    TCO_URL_LENGTH = 23
-    
+
     # Find all URLs in the text
-    url_pattern = r'https?://[^\s]+'
-    urls = re.findall(url_pattern, text)
-    
-    # Start with the original text length
-    calculated_length = len(text)
-    
+    urls = tweet_length_rules.URL_PATTERN.findall(text)
+
     # Find mentions and hashtags for reporting
     mentions = re.findall(r'@\w+', text)
     hashtags = re.findall(r'#\w+', text)
-    
-    # Replace each URL with Twitter's t.co equivalent length
-    for url in urls:
-        original_url_length = len(url)
-        # Subtract original URL length and add t.co length
-        calculated_length = calculated_length - original_url_length + TCO_URL_LENGTH
-    
+
     return {
-        'length': calculated_length,
+        # Weighted count: emoji and CJK count as 2, each URL as a 23-character t.co link
+        'length': tweet_length_rules.tweet_length(text),
         'url_count': len(urls),
         'mention_count': len(mentions),
         'hashtag_count': len(hashtags),

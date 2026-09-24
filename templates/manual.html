@@ -143,11 +143,26 @@ endblock %} {% block content %}
   }
 </style>
 <script>
+  // Weighted length as Twitter counts it (same rules as tweet_length.py):
+  // code points in these ranges count 1, others (CJK, emoji) count 2, URLs count 23
+  const SINGLE_WEIGHT_RANGES = [[0x0000, 0x10ff], [0x2000, 0x200d], [0x2010, 0x201f], [0x2032, 0x2037]];
+  const URL_PATTERN = /https?:\/\/[^\s]+/g;
+
+  function tweetLength(text) {
+    const urlCount = (text.match(URL_PATTERN) || []).length;
+    let length = urlCount * 23;
+    for (const char of text.replace(URL_PATTERN, "")) {
+      const code = char.codePointAt(0);
+      length += SINGLE_WEIGHT_RANGES.some(([low, high]) => code >= low && code <= high) ? 1 : 2;
+    }
+    return length;
+  }
+
   // Character count update
   function updateCharCount() {
     const textarea = document.getElementById("tweet-text");
     const charCount = document.getElementById("char-count");
-    const length = textarea.value.length;
+    const length = tweetLength(textarea.value);
 
     charCount.textContent = `${length}/280`;
 
