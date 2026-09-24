@@ -366,8 +366,8 @@ endblock %} {% block content %}
 
   // Countdown Timer Functions
   function initializeCountdown() {
-    // Get last tweet time from localStorage or use current time
-    const lastTweetTime = localStorage.getItem('lastTweetTime');
+    // Get last tweet time from the cookie or use current time
+    const lastTweetTime = readCookie('lastTweetTime');
 
     if (lastTweetTime) {
       const lastTime = new Date(parseInt(lastTweetTime));
@@ -392,7 +392,19 @@ endblock %} {% block content %}
   function resetCountdown() {
     // Set next tweet time to CYCLE_DURATION minutes from now
     nextTweetTime = new Date(Date.now() + (CYCLE_DURATION * 60 * 1000));
-    localStorage.setItem('lastTweetTime', Date.now().toString());
+    writeCookie('lastTweetTime', Date.now().toString());
+  }
+
+  // Countdown state is kept in a cookie scoped to this site
+  function readCookie(name) {
+    const prefix = name + '=';
+    const entry = document.cookie.split('; ').find(part => part.startsWith(prefix));
+    return entry ? decodeURIComponent(entry.slice(prefix.length)) : null;
+  }
+
+  function writeCookie(name, value) {
+    const maxAgeSeconds = 7 * 24 * 60 * 60;
+    document.cookie = `${name}=${encodeURIComponent(value)}; max-age=${maxAgeSeconds}; path=/; SameSite=Strict`;
   }
 
   function startCountdown() {
