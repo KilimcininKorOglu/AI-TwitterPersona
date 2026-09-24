@@ -560,14 +560,16 @@ def api_control():
     if not action or action not in ['start', 'stop']:
         return jsonify({"success": False, "message": "Geçersiz action: 'start' veya 'stop' olmalı"}), 400
     
+    global bot_stop_event
     with bot_lock:
         if action == 'start' and not bot_running:
             try:
-                # Clear any previous stop signal
-                bot_stop_event.clear()
+                # Give each run its own stop event: a previous thread that is still
+                # blocked in a network call keeps its set event and exits afterwards
+                bot_stop_event = threading.Event()
 
                 print(f"[INFO] Starting bot thread...")
-                bot_thread = threading.Thread(target=run_bot_thread)
+                bot_thread = threading.Thread(target=run_bot_thread, args=(bot_stop_event,))
                 bot_thread.daemon = True
                 bot_thread.start()
                 bot_running = True
@@ -586,13 +588,9 @@ def api_control():
             try:
                 print(f"[INFO] Stopping bot thread...")
                 bot_running = False
-                bot_stop_event.set()  # Signal thread to stop
-
-                # Wait for thread to finish gracefully
-                if bot_thread and bot_thread.is_alive():
-                    bot_thread.join(timeout=3.0)
-
-                bot_stop_event.clear()  # Reset for future use
+                # Signal the thread; it exits at its next stop-event check. The event
+                # stays set so a thread blocked in a long call still stops afterwards.
+                bot_stop_event.set()
 
                 # Clear bot start time when stopped
                 bot_stats["bot_start_time"] = None
@@ -1188,13 +1186,19 @@ def get_current_trends():
         print(f"Trends fetch error: {e}")
         return []
 
-def run_bot_thread():
-    """Run bot in separate thread with proper event-based termination"""
+def mark_bot_stopped_if_current():
+    """Clear bot_running only when the calling thread is the active bot thread."""
     global bot_running
+    with bot_lock:
+        # A stopped thread that finishes late must not flag a newer run as stopped
+        if bot_thread is threading.current_thread():
+            bot_running = False
+
+def run_bot_thread(stop_event):
+    """Run bot in separate thread with proper event-based termination"""
     if not API_MODULES_LOADED or not main:
         print("[ERROR] Bot modules not loaded - cannot start bot")
-        with bot_lock:
-            bot_running = False
+        mark_bot_stopped_if_current()
         return
 
     try:
@@ -1209,11 +1213,10 @@ def run_bot_thread():
         if hasattr(main, 'initialize_bot_modules'):
             if not main.initialize_bot_modules():
                 print("[ERROR] Could not initialize bot modules")
-                with bot_lock:
-                    bot_running = False
+                mark_bot_stopped_if_current()
                 return
 
-        while not bot_stop_event.is_set():
+        while not stop_event.is_set():
             try:
                 prompt = ""
                 topic = ""
@@ -1229,7 +1232,7 @@ def run_bot_thread():
                         print("[!] No trending topics found")
                         broadcast_console_log('WARNING', 'No trending topics found')
                         # Wait before retry
-                        if bot_stop_event.wait(timeout=60):
+                        if stop_event.wait(timeout=60):
                             break
                         continue
 
@@ -1258,9 +1261,12 @@ def run_bot_thread():
                     print(f"[{datetime.now().strftime('%H:%M:%S')}] Political topic detected, skipping...")
                     broadcast_console_log('WARNING', 'Political topic detected, skipping to avoid controversy')
                     # Try again with shorter wait
-                    if bot_stop_event.wait(timeout=10):
+                    if stop_event.wait(timeout=10):
                         break
                     continue
+                elif stop_event.is_set():
+                    # Stop was requested while the tweet was generated; do not post it
+                    break
                 elif tweet:
                     print(f"[{datetime.now().strftime('%H:%M:%S')}] Tweet generated: {tweet}")
                     broadcast_console_log('SUCCESS', f'Tweet generated: {tweet}')
@@ -1296,22 +1302,21 @@ def run_bot_thread():
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] Sleeping for {CYCLE_DURATION_MINUTES} minutes...")
                 broadcast_console_log('INFO', f'Next tweet in {CYCLE_DURATION_MINUTES} minutes')
 
-                if bot_stop_event.wait(timeout=CYCLE_DURATION_MINUTES * 60):
+                if stop_event.wait(timeout=CYCLE_DURATION_MINUTES * 60):
                     break  # Event was set during wait, exit loop
 
             except Exception as cycle_error:
                 print(f"Bot cycle error: {cycle_error}")
                 broadcast_console_log('ERROR', f'Bot cycle error: {str(cycle_error)}')
                 # Continue running even if one cycle fails
-                if bot_stop_event.wait(timeout=60):  # Wait 1 minute before retry
+                if stop_event.wait(timeout=60):  # Wait 1 minute before retry
                     break
 
     except Exception as e:
         print(f"Bot thread error: {e}")
         broadcast_console_log('ERROR', f'Bot thread error: {str(e)}')
     finally:
-        with bot_lock:
-            bot_running = False
+        mark_bot_stopped_if_current()
         print("[INFO] Bot thread terminated gracefully")
         broadcast_console_log('INFO', 'Bot stopped')
 
