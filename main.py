@@ -87,26 +87,23 @@ _client_initialized = False
 def initialize_twitter_client():
     """Initialize Twitter client with thread-safe error handling"""
     global client, _client_initialized
-    
-    # Quick check without lock for performance
-    if _client_initialized:
-        return True
-    
-    # Double-checked locking pattern for thread safety
+
     with _client_lock:
-        if _client_initialized:
-            return True  # Another thread already initialized
-        
         if not initialize_bot_modules():
             return False
-            
+
         try:
-            print("[INFO] Initializing Twitter client (thread-safe)...")
-            client = twitter_client.get_client()  # Get authenticated Twitter client
-            if client is None:
+            # get_client() returns its cached client unless the credentials changed,
+            # so updated keys from the dashboard take effect without a restart
+            new_client = twitter_client.get_client()
+            if new_client is None:
+                client = None
+                _client_initialized = False
                 return False
+            if new_client is not client:
+                print("[+] Twitter client initialized successfully")
+            client = new_client
             _client_initialized = True
-            print("[+] Twitter client initialized successfully")
             return True
         except Exception as e:
             logging.error(f"Error initializing Twitter client: {e}")
